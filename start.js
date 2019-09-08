@@ -12,6 +12,7 @@ const network = require("ocore/network");
 let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 let assocDeviceAddressToAddress = {};
+let aa_addess = "2NMZB4PTG4KCQHWPLEJGSJAFHHRA7JS4"
 
 /**
  * headless wallet is ready
@@ -32,32 +33,39 @@ eventBus.once('headless_wallet_ready', () => {
 	 * user sends message to the bot
 	 */
 	eventBus.on('text', (from_address, text) => {
-		// analyze the text and respond
+
+
 		text = text.trim().toLowerCase();
+
+		// initialize state machine
 		if (!steps[from_address]) steps[from_address] = 'start';
 		let step = steps[from_address];
+
 		const device = require('ocore/device.js');
 
+		//state machine: start
 		if (step === 'start') {
 			device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer!\n Press any key to start.");
 			steps[from_address] = 'buyOrSell';
+
+			//state machine: buyOrSell	
 		} else if (step === 'buyOrSell') {
 			switch (text) {
 				case 'buyer':
 					setTimeout(() => {
 						network.requestFromLightVendor('light/get_aa_state_vars', {
-							address: "CSHY6AJMJ7QYDHWRBD5MIA3V2MHJG2BY"
+							address: aa_addess
 						}, (ws, request, response) => {
 
-							var auctions = getData (response)
-							console.error("response: "+response.toString())
-							console.error("auctions: "+auctions.toString())
-				
+							var auctions = getData(response)
+							console.error("response: " + response.toString())
+							console.error("auctions: " + auctions.toString())
+
 
 							//TODO 
 							//check if auction_running==true
 							//prepare and format overview, calculate prices, prepare links
-							let message = prepareAuctionOverview(auctions)	
+							let message = prepareAuctionOverview(auctions)
 
 							//send response
 							device.sendMessageToDevice(from_address, 'text', message);
@@ -77,6 +85,7 @@ eventBus.once('headless_wallet_ready', () => {
 			}
 		}
 
+		//state machine: sell steps
 		else if (step === 'sell_description') {
 			sellTempData[from_address] = { "seller": "true" }
 			sellTempData[from_address]['product_description'] = text;
@@ -116,7 +125,7 @@ eventBus.once('headless_wallet_ready', () => {
 			let encodedbase64data = encodeURIComponent(base64data);
 
 			//start auction
-			device.sendMessageToDevice(from_address, 'text', "[create auction](byteball:CSHY6AJMJ7QYDHWRBD5MIA3V2MHJG2BY?amount=11000&base64data=" + encodedbase64data + ")");
+			device.sendMessageToDevice(from_address, 'text', "[create auction](byteball:" + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")");
 
 
 			steps[from_address] = 'start';
@@ -154,67 +163,68 @@ process.on('unhandledRejection', up => { throw up; });
 * Helper functions
 */
 
-function getData(auctions_flat){
+function getData(auctions_flat) {
 	var auctions = {}
 	//parse response
 	for (let k of Object.keys(auctions_flat)) {
 		let pair = new Array()
 
-		pair = k.split('.')
-		let productID = pair[0]
-		let productParam = ""
-		if (pair.length == 2) {
-			productParam = pair[1]
-
-			if (!auctions[productID]) auctions[productID] = {};
-
-			auctions[productID][productParam] = auctions_flat[k];
+		if(k.startsWith('auction.')){
+			// e.g. 'auction.$reference.timestamp'
+			pair = k.split('.')
+			let auctionID = pair[1]
+			let auctionParam  = pair[2]
+			
+			if (!auctions[auctionID]) auctions[auctionID] = {};
+			auctions[auctionID][auctionParam] = auctions_flat[k];
 		}
 	}
 	return auctions
 }
 
-function prepareAuctionOverview(auctions){
+function prepareAuctionOverview(auctions) {
 	var message;
 	message = "The following acutions are currently running. Click to bid!\n\n"
 
 	for (let k of Object.keys(auctions)) {
 
-		//work arround
-		if (auctions[k]['bid']) continue;
-		//console.error("keys from" +k +": "+Object.keys(auctions[k]) + "\n")
+		//do not show finished auctions
+		var auction_status = auctions[k][auction_status]
+		if (auction_status != 'running') continue
 
 		// calucalate current price
 		var start_price = auctions[k]['start_price'].valueOf();
 		var timestamp_now = new Date().valueOf()
-		var timestamp =  auctions[k]['timestamp']+"000".valueOf();
-		var time_steps =  auctions[k]['time_steps'].valueOf();
-		var price_steps =  auctions[k]['price_steps'].valueOf();
+		var timestamp = auctions[k]['timestamp'] + "000".valueOf();
+		var time_steps = auctions[k]['time_steps'].valueOf();
+		var price_steps = auctions[k]['price_steps'].valueOf();
 		var lowest_price = auctions[k]['lowest_price'].valueOf();
 		var noSteps = ((timestamp_now - timestamp) / (time_steps * 1000)).toFixed(0)
-
 		var current_price = start_price - (noSteps * price_steps)
+
+		//set current prise to lowest price if it is reached / overreached
 		if (current_price < lowest_price) current_price = lowest_price
+
 		//add 10000 for fees
 		current_price = parseInt(current_price) + 10000
 
 		// create buy link
-		var link_data = { 
-			"buyer"  :  "1", 
-			"reference"   :  k
+		var link_data = {
+			"buyer": "1",
+			"reference": k
 		}
 
 		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
 		let encodedbase64data = encodeURIComponent(base64data);
-	    let buylink = "Bid for product: [bid for product](byteball:CSHY6AJMJ7QYDHWRBD5MIA3V2MHJG2BY?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
-		console.error("buylink: " +buylink)
+		let buylink = "Bid for product: [bid for product](byteball:" + aa_addess + "?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
+		console.error("buylink: " + buylink)
 
-		message += "**"+auctions[k]['product_description'] +"**\n"
-		message += "Current_price: " + current_price +"\n"		
+		message += "**" + auctions[k]['product_description'] + "**\n"
+		message += "Current_price: " + current_price + "\n"
 		//message += "start_price: " + auctions[k]['start_price'] +"\n"
 		//message += "lowest_price: " + auctions[k]['lowest_price'] +"\n"
 		//message += "time_steps: " + auctions[k]['time_steps'] +"\n"
-		message += buylink +"\n"
+		message += buylink + "\n"
 		message += "---------------------------\n\n"
 		//message += "price_steps: " + auctions[k]['price_steps'] +"\n\n"
 	}
