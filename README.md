@@ -1,6 +1,6 @@
 # Bot Example
 
-Example source code for O<sub>byte</sub> chatbot.  Copy this bot and start adding your stuff.
+O<sub>byte</sub> chatbot an autonomous auctioneer.  TODO: write docu.
 
 ## Requirements
 

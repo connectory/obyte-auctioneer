@@ -12,7 +12,7 @@ exports.storage = 'sqlite';
 //exports.socksPort = 9050;
 
 exports.hub = process.env.testnet ? 'obyte.org/bb-test' : 'obyte.org/bb';
-exports.deviceName = 'Bot example';
+exports.deviceName = 'Autonomous auctioneer';
 exports.permanent_pairing_secret = '*'; // * allows to pair with any code, the code is passed as 2nd param to the pairing event handler
 exports.control_addresses = [''];
 exports.payout_address = 'WHERE THE MONEY CAN BE SENT TO';
