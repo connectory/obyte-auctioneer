@@ -11,7 +11,8 @@ const network = require("ocore/network");
 
 let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
-let assocDeviceAddressToAddress = {};
+
+//the address of the a. agent
 let aa_addess = "2NMZB4PTG4KCQHWPLEJGSJAFHHRA7JS4"
 
 /**
@@ -26,15 +27,13 @@ eventBus.once('headless_wallet_ready', () => {
 	eventBus.on('paired', (from_address, pairing_secret) => {
 		// send a geeting message
 		const device = require('ocore/device.js');
-		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer!  [start](command:start) ");
+		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Type [start](command:start) to start");
 	});
 
 	/**
 	 * user sends message to the bot
 	 */
 	eventBus.on('text', (from_address, text) => {
-
-
 		text = text.trim().toLowerCase();
 
 		// initialize state machine
@@ -45,7 +44,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: start
 		if (step === 'start') {
-			device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer!\n Press any key to start.");
+			device.sendMessageToDevice(from_address, 'text', "Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)");
 			steps[from_address] = 'buyOrSell';
 
 			//state machine: buyOrSell	
@@ -57,20 +56,16 @@ eventBus.once('headless_wallet_ready', () => {
 							address: aa_addess
 						}, (ws, request, response) => {
 
+							//get auction data 
 							var auctions = getData(response)
-							console.error("response: " + response.toString())
-							console.error("auctions: " + auctions.toString())
 
-
-							//TODO 
-							//check if auction_running==true
-							//prepare and format overview, calculate prices, prepare links
+							//prepare message
 							let message = prepareAuctionOverview(auctions)
 
 							//send response
 							device.sendMessageToDevice(from_address, 'text', message);
 
-							steps[from_address] = 'start';
+							steps[from_address] = 'buyOrSell';
 						})
 
 					}, 1000)
@@ -80,7 +75,7 @@ eventBus.once('headless_wallet_ready', () => {
 					steps[from_address] = 'sell_description';
 					break;
 				default:
-					device.sendMessageToDevice(from_address, 'text', "Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)");
+					device.sendMessageToDevice(from_address, 'text', "No valid option here. Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)");
 					break;
 			}
 		}
@@ -117,18 +112,14 @@ eventBus.once('headless_wallet_ready', () => {
 
 		else if (step === 'sell_startAuction') {
 			sellTempData[from_address]['time_steps'] = text;
-
-			//sellTempData[from_address].forEach(logMapElements);
-			//device.sendMessageToDevice(from_address, 'text', "Summary: " + sellTempData[from_address]['description'] + " " +sellTempData[from_address]['price'] );
-
+			
 			let base64data = Buffer.from(JSON.stringify(sellTempData[from_address])).toString('base64');
 			let encodedbase64data = encodeURIComponent(base64data);
 
 			//start auction
 			device.sendMessageToDevice(from_address, 'text', "[create auction](byteball:" + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")");
 
-
-			steps[from_address] = 'start';
+			steps[from_address] = 'buyOrSell';
 		}
 	});
 
@@ -136,14 +127,13 @@ eventBus.once('headless_wallet_ready', () => {
 
 
 /**
- * user pays to the bot
+ * user pays to / sends data to the bot 
  */
 eventBus.on('new_my_transactions', (arrUnits) => {
 	// handle new unconfirmed payments
 	// and notify user
 
-	//	const device = require('ocore/device.js');
-	//	device.sendMessageToDevice(device_address_determined_by_analyzing_the_payment, 'text', "Received your payment");
+	console.error("new_my_transactions")
 });
 
 /**
@@ -153,8 +143,15 @@ eventBus.on('my_transactions_became_stable', (arrUnits) => {
 	// handle payments becoming confirmed
 	// and notify user
 
+	console.error("my_transactions_became_stable")
+
 	//	const device = require('ocore/device.js');
 	//	device.sendMessageToDevice(device_address_determined_by_analyzing_the_payment, 'text', "Your payment is confirmed");
+});
+
+eventBus.on("object", (from_address, body, message_counter) => {
+
+	console.error("body: " + body)
 });
 
 process.on('unhandledRejection', up => { throw up; });
@@ -163,18 +160,19 @@ process.on('unhandledRejection', up => { throw up; });
 * Helper functions
 */
 
+//transform the flat map to a proper data structure
 function getData(auctions_flat) {
 	var auctions = {}
 	//parse response
 	for (let k of Object.keys(auctions_flat)) {
 		let pair = new Array()
 
-		if(k.startsWith('auction.')){
+		if (k.startsWith('auction.')) {
 			// e.g. 'auction.$reference.timestamp'
 			pair = k.split('.')
 			let auctionID = pair[1]
-			let auctionParam  = pair[2]
-			
+			let auctionParam = pair[2]
+
 			if (!auctions[auctionID]) auctions[auctionID] = {};
 			auctions[auctionID][auctionParam] = auctions_flat[k];
 		}
@@ -184,13 +182,17 @@ function getData(auctions_flat) {
 
 function prepareAuctionOverview(auctions) {
 	var message;
-	message = "The following acutions are currently running. Click to bid!\n\n"
+	message = "The following auctions are currently running. Click to bid:\n\n"
+
+	var counter_running_auctions = 0
 
 	for (let k of Object.keys(auctions)) {
 
 		//do not show finished auctions
 		var auction_status = auctions[k]['auction_status']
 		if (auction_status != 'running') continue
+
+		else counter_running_auctions += 1
 
 		// calucalate current price
 		var start_price = auctions[k]['start_price'].valueOf();
@@ -221,13 +223,13 @@ function prepareAuctionOverview(auctions) {
 
 		message += "**" + auctions[k]['product_description'] + "**\n"
 		message += "Current_price: " + current_price + "\n"
-		//message += "start_price: " + auctions[k]['start_price'] +"\n"
-		//message += "lowest_price: " + auctions[k]['lowest_price'] +"\n"
-		//message += "time_steps: " + auctions[k]['time_steps'] +"\n"
 		message += buylink + "\n"
 		message += "---------------------------\n\n"
-		//message += "price_steps: " + auctions[k]['price_steps'] +"\n\n"
 	}
+
+	if (counter_running_auctions == 0 ) message = message + "-\n"
+
+	message += 	"Do something else: Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)"
 
 	return message;
 }
