@@ -189,7 +189,7 @@ function prepareAuctionOverview(auctions) {
 	for (let k of Object.keys(auctions)) {
 
 		//do not show finished auctions
-		var auction_status = auctions[k][auction_status]
+		var auction_status = auctions[k]['auction_status']
 		if (auction_status != 'running') continue
 
 		// calucalate current price

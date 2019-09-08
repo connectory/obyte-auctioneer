@@ -1,0 +1,212 @@
+{
+    /**
+     * Dutch Auction AA
+     *
+     */
+    bounce_fees: { base: 10000 },
+    init: `{
+        $BOUNCE_FEE = 10000;
+        $TYPICAL_FEE = 1300;
+        $REIMBURSEMENT = $BOUNCE_FEE - $TYPICAL_FEE;
+    }`,
+    messages: {
+        cases: [
+            { // seller creates auction
+                if: `{ trigger.data.seller }`,
+                init: `{
+                    $seller = trigger.address;
+                    $start_price = trigger.data.start_price otherwise bounce ("start price is missing");
+                    $lowest_price = trigger.data.lowest_price otherwise bounce ("lowest price is missing");
+                    $time_steps = trigger.data.time_steps otherwise bounce ("time steps missing");
+                    $price_steps = trigger.data.price_steps otherwise bounce ("price steps missing");
+                    $product_description = trigger.data.product_description otherwise bounce ("product description is missing");
+                    $product_url = trigger.data.product_url;
+                    $auction_status = 'running';
+
+                    $reference = sha256($seller || $start_price || $lowest_price || $time_steps || $price_steps || $product_description || $auction_status || timestamp);
+                }`,
+                messages: [
+                    {
+                        app: 'state',
+                        state: `{
+							var['auction.'||$reference||'.timestamp'] = timestamp;
+                            var['auction.'||$reference||'.seller'] = $seller;
+                            var['auction.'||$reference||'.start_price'] = $start_price;
+                            var['auction.'||$reference||'.lowest_price'] = $lowest_price;
+                            var['auction.'||$reference||'.time_steps'] = $time_steps;
+                            var['auction.'||$reference||'.price_steps'] = $price_steps;
+                            var['auction.'||$reference||'.product_description'] = $product_description;
+                            //var['auction.'||$reference||'.product_url'] = $product_url;
+                            var['auction.'||$reference||'.start_time'] = $start_time;
+                            var['auction.'||$reference||'.end_time'] = $end_time;
+                            var['auction.'||$reference||'.auction_status'] = $auction_status;
+                            response['reference'] = $reference;
+                            response['status'] = $auction_status;
+                        }`
+                    }
+                ]
+            },
+            { // buyer bids on auction
+                if: `{ trigger.data.buyer }`,
+                init: `{
+                    $reference = trigger.data.reference;
+                    $buyer = trigger.address;
+                    $bid = trigger.output[[asset = base]];
+					$start_price = var['auction.'||$reference||'.start_price'];
+					$timestamp_saved = var['auction.'||$reference||'.timestamp'];
+					$time_steps = var['auction.'||$reference||'.time_steps'];
+					$price_steps = var['auction.'||$reference||'.price_steps'];
+					$lowest_price = var['auction.'||$reference||'.lowest_price'];
+                    $price_now = $start_price-(round((timestamp - $timestamp_saved)/$time_steps) * $price_steps);
+                    $PRICE = ($price_now< $lowest_price ? $lowest_price : $price_now);
+                }`,
+                messages: {
+                    cases: [
+                        { // bid bigger then price
+                            if: `{ $bid > $price_now AND var['auction.'||$reference||'.auction_status'] == 'running'}`,
+                            messages: [
+                                {
+                                    app: 'payment',
+                                    payload: {
+                                    asset: 'base',
+                                    outputs: [
+                                        {address: "{trigger.address}", amount: "{$bid-$PRICE-$BOUNCE_FEE}"}
+                                    ]
+                                    }
+                                },
+                                {
+                                    app: 'state',
+                                    state: `{
+                                        var['auction.'||$reference||'.bid'] = $bid;
+										var['auction.'||$reference||'.buyer'] = $buyer;
+                                        var['auction.'||$reference||'.auction_status'] = 'finished';
+                                        response['message'] = 'Congratulations, you have won the auction';
+                                        response['payment'] = 'You have paid more than neccessary. We have reimbursed the exceeding amount!';
+                                    }`
+                                }
+                            ]
+                        },
+                        { // bid smaller then price
+                            if: `{ $bid < $price_now AND var['auction.'||$reference||'.auction_status'] == 'running'}`,
+                            messages: [
+                                {
+                                    app: 'payment',
+                                    payload: {
+                                    asset: 'base',
+                                    outputs: [
+                                        {address: "{trigger.address}", amount: "{$bid-$BOUNCE_FEE}"},
+                                        {address: "{trigger.address}", amount: "{$REIMBURSEMENT}"}
+                                    ]
+                                    }
+                                },
+                                {
+                                    app: 'state',
+                                    state: `{
+                                        response['message'] = 'Sorry, the amount is too low. We have reimbursed your payment minus transaction fees. Please bid again and pay the right amount.';
+                                    }`
+                                }
+                            ]
+                        },
+                        { // bid matches price
+                            if: `{ $bid == $price_now AND var['auction.'||$reference||'.auction_status'] == 'running'}`,
+                            messages: [
+                                {
+                                    app: 'state',
+                                    state: `{
+                                        var['auction.'||$reference||'.bid'] = $bid;
+										var['auction.'||$reference||'.buyer'] = $buyer;
+                                        var['auction.'||$reference||'.auction_status'] = 'finished';
+                                        response['reference2'] = $reference2;
+                                        response['message'] = 'Congratulations, you have won the auction';
+                                    }`
+                                }
+                            ]
+                        }
+                    ]   
+                }
+            },
+            { // buyer confirms data to seller sent
+                if: `{ !!trigger.data.buyer_data_confirm AND var['auction.'||trigger.data.reference||'.auction_status'] == 'finished'}`,
+                init: `{
+                    $reference = trigger.data.reference;
+                    $buyer = trigger.address;
+                }`,
+                messages: [
+                    {
+                        app: 'payment',
+                        payload: {
+                            asset: 'base',
+                            outputs: [{address: "{trigger.address}", amount: "{$REIMBURSEMENT}"}]
+                        }
+                    },
+                    {
+                        app: 'state',
+                        state: `{
+                            var['auction.'||$reference||'.auction_status'] = 'buyer_data_confirm';
+                            response['message'] = 'Thank you for confirming that you have sent your data to the seller!';
+                        }`
+                    }
+                ]
+            },
+            { // buyer confirms goods receipt
+                if: `{ !!trigger.data.goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                init: `{
+                    $reference = trigger.data.reference;
+                }`,
+                messages: [
+                    {
+                        app: 'payment',
+                        payload: {
+                            asset: 'base',
+                            outputs: [
+                                {address: "{var['auction.'||$reference||'.seller']}", amount: "{var['auction.'||$reference||'.bid']}"}
+                            ]
+                        }
+                    },
+                    {
+                        app: 'state',
+                        state: `{
+                            var['auction.'||$reference||'.auction_status'] = 'goods_receipt';
+                            response['message'] = 'Thank you for confirming that you have received the goods! We payed the seller!';
+                        }`
+                    }
+                ]
+            },
+            { // buyer did not receive goods
+                if: `{ !!trigger.data.no_goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                init: `{
+                    $reference = trigger.data.reference;
+                }`,
+                messages: [
+                    {
+                        app: 'payment',
+                        payload: {
+                            asset: 'base',
+                            outputs: [{address: "{trigger.address}", amount: "{$REIMBURSEMENT}"}]
+                        }
+                    },
+                    {
+                        app: 'state',
+                        state: `{
+                            var['auction.'||$reference||'.auction_status'] = 'no_goods_receipt';
+                            response['message'] = 'Thank you for letting us know. We still hold your money as an decentralized escrow and will inform an arbiter to look into the case. After he did that you will receive your money back if the seller can´t prove that he has sent it to you.';
+                        }`
+                    }
+                ]
+            },
+            {
+                init: `{
+                    bounce("Enter buyer or seller");
+                }`,
+                messages: [
+                    {
+                        app: 'state',
+                        state: `{
+                            response['usage'] = 'Enter buyer or seller';
+                        }`
+                    }
+                ]
+            }
+        ]
+    }
+}
