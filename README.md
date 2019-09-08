@@ -1,6 +1,6 @@
-# Bot Example
+# Autonomous Auctioneer
 
-O<sub>byte</sub> chatbot an autonomous auctioneer.  TODO: write docu.
+O<sub>byte</sub> The Autonomous auctioneer.  TODO: write docu.
 
 ## Requirements
 
