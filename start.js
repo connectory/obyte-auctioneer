@@ -27,7 +27,7 @@ eventBus.once('headless_wallet_ready', () => {
 	eventBus.on('paired', (from_address, pairing_secret) => {
 		// send a geeting message
 		const device = require('ocore/device.js');
-		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Type [start](command:start) to start");
+		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Press [start](command:start) to start");
 	});
 
 	/**
@@ -71,7 +71,7 @@ eventBus.once('headless_wallet_ready', () => {
 					}, 1000)
 					break;
 				case 'seller':
-					device.sendMessageToDevice(from_address, 'text', "What do you want to sell? e.g. [An Apple](command:An Apple)");
+					device.sendMessageToDevice(from_address, 'text', "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)");
 					steps[from_address] = 'sell_description';
 					break;
 				default:
@@ -85,28 +85,28 @@ eventBus.once('headless_wallet_ready', () => {
 			sellTempData[from_address] = { "seller": "true" }
 			sellTempData[from_address]['product_description'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which price to start with? e.g. [500](command:500)");
+			device.sendMessageToDevice(from_address, 'text', "Which price to start with? e.g. [500](suggest-command:500)");
 			steps[from_address] = 'sell_startprice';
 		}
 
 		else if (step === 'sell_startprice') {
 			sellTempData[from_address]['start_price'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which is the lowest price you want? e.g. [100](command:100)");
+			device.sendMessageToDevice(from_address, 'text', "Which is the lowest price you want? e.g. [100](suggest-command:100)");
 			steps[from_address] = 'sell_lowestprice';
 		}
 
 		else if (step === 'sell_lowestprice') {
 			sellTempData[from_address]['lowest_price'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which price steps to use? e.g. [50](command:50)");
+			device.sendMessageToDevice(from_address, 'text', "Which price steps to use? e.g. [50](suggest-command:50)");
 			steps[from_address] = 'sell_pricesteps';
 		}
 
 		else if (step === 'sell_pricesteps') {
 			sellTempData[from_address]['price_steps'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which time steps to use? e.g. [3600](command:3600)");
+			device.sendMessageToDevice(from_address, 'text', "Which time steps to use? e.g. [3600](suggest-command:3600)");
 			steps[from_address] = 'sell_startAuction';
 		}
 
