@@ -79,7 +79,7 @@
                                     state: `{
                                         var['auction.'||$reference||'.bid'] = $bid;
 										var['auction.'||$reference||'.buyer'] = $buyer;
-                                        var['auction.'||$reference||'.auction_status'] = 'finished';
+                                        var['auction.'||$reference||'.auction_status'] = 'holding';
                                         response['message'] = 'Congratulations, you have won the auction';
                                         response['payment'] = 'You have paid more than neccessary. We have reimbursed the exceeding amount!';
                                     }`
@@ -115,7 +115,7 @@
                                     state: `{
                                         var['auction.'||$reference||'.bid'] = $bid;
 										var['auction.'||$reference||'.buyer'] = $buyer;
-                                        var['auction.'||$reference||'.auction_status'] = 'finished';
+                                        var['auction.'||$reference||'.auction_status'] = 'holding';
                                         response['reference2'] = $reference2;
                                         response['message'] = 'Congratulations, you have won the auction';
                                     }`
@@ -126,7 +126,7 @@
                 }
             },
             { // buyer confirms data to seller sent
-                if: `{ !!trigger.data.buyer_data_confirm AND var['auction.'||trigger.data.reference||'.auction_status'] == 'finished'}`,
+                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.buyer_data_confirm AND var['auction.'||trigger.data.reference||'.auction_status'] == 'holding'}`,
                 init: `{
                     $reference = trigger.data.reference;
                     $buyer = trigger.address;
@@ -136,7 +136,7 @@
                         app: 'payment',
                         payload: {
                             asset: 'base',
-                            outputs: [{address: "{trigger.address}", amount: "{$REIMBURSEMENT}"}]
+                            outputs: [{address: "{$buyer}", amount: "{$REIMBURSEMENT}"}]
                         }
                     },
                     {
@@ -149,9 +149,13 @@
                 ]
             },
             { // buyer confirms goods receipt
-                if: `{ !!trigger.data.goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
                 init: `{
                     $reference = trigger.data.reference;
+                    $seller = var['auction.'||trigger.data.reference||'.seller'];
+                    $comment = trigger.data.comment; 
+                    $voting = trigger.data.voting; //1-5
+                    $comment_reference = sha256($reference || $seller || timestamp);
                 }`,
                 messages: [
                     {
@@ -167,15 +171,22 @@
                         app: 'state',
                         state: `{
                             var['auction.'||$reference||'.auction_status'] = 'goods_receipt';
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.comment'] = $comment;
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.voting'] = $voting;
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.auction'] = $reference;
                             response['message'] = 'Thank you for confirming that you have received the goods! We payed the seller!';
                         }`
                     }
                 ]
             },
             { // buyer did not receive goods
-                if: `{ !!trigger.data.no_goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                if: `{ trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.no_goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
                 init: `{
                     $reference = trigger.data.reference;
+                    $seller = var['auction.'||trigger.data.reference||'.seller'];
+                    $comment = trigger.data.comment; 
+                    $voting = trigger.data.voting; //1-5
+                    $comment_reference = sha256($reference || $seller || timestamp);
                 }`,
                 messages: [
                     {
@@ -189,6 +200,9 @@
                         app: 'state',
                         state: `{
                             var['auction.'||$reference||'.auction_status'] = 'no_goods_receipt';
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.comment'] = $comment;
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.voting'] = $voting;
+                            var['seller.'||$seller||'.comment.'||$comment_reference||'.auction'] = $reference;
                             response['message'] = 'Thank you for letting us know. We still hold your money as an decentralized escrow and will inform an arbiter to look into the case. After he did that you will receive your money back if the seller can´t prove that he has sent it to you.';
                         }`
                     }
