@@ -13,7 +13,7 @@ let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
-let aa_addess = "2NMZB4PTG4KCQHWPLEJGSJAFHHRA7JS4"
+let aa_addess = "2EBQW3IICBBBXBQQX6CLTOH2CTUHGNSS"
 
 /**
  * headless wallet is ready
