@@ -15,6 +15,8 @@ let sellTempData = {}; // store seller's temp product data
 //the address of the a. agent
 let aa_addess = "2EBQW3IICBBBXBQQX6CLTOH2CTUHGNSS"
 
+let mainMenuText= "\n -> [buy](command:buy) \n -> [sell](command:sell) \n -> [confirm data sent to seller](command:confirm_data_sent)"
+
 /**
  * headless wallet is ready
  */
@@ -27,7 +29,7 @@ eventBus.once('headless_wallet_ready', () => {
 	eventBus.on('paired', (from_address, pairing_secret) => {
 		// send a geeting message
 		const device = require('ocore/device.js');
-		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Press [start](command:start) to start");
+		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Press [start](command:start) to start");	
 	});
 
 	/**
@@ -44,13 +46,13 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: start
 		if (step === 'start') {
-			device.sendMessageToDevice(from_address, 'text', "Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)");
-			steps[from_address] = 'buyOrSell';
+			device.sendMessageToDevice(from_address, 'text', "What do you want to do? "+mainMenuText);
+			steps[from_address] = 'mainMenu';		
 
-			//state machine: buyOrSell	
-		} else if (step === 'buyOrSell') {
+		//state machine: mainMenu	
+		} else if (step === 'mainMenu') {
 			switch (text) {
-				case 'buyer':
+				case 'buy':
 					setTimeout(() => {
 						network.requestFromLightVendor('light/get_aa_state_vars', {
 							address: aa_addess
@@ -65,17 +67,37 @@ eventBus.once('headless_wallet_ready', () => {
 							//send response
 							device.sendMessageToDevice(from_address, 'text', message);
 
-							steps[from_address] = 'buyOrSell';
+							steps[from_address] = 'mainMenu';
 						})
 
 					}, 1000)
 					break;
-				case 'seller':
+				case 'sell':
 					device.sendMessageToDevice(from_address, 'text', "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)");
 					steps[from_address] = 'sell_description';
 					break;
+				case 'confirm_data_sent':
+					setTimeout(() => {
+						network.requestFromLightVendor('light/get_aa_state_vars', {
+							address: aa_addess
+						}, (ws, request, response) => {
+
+							//get auction data 
+							var auctions = getData(response)
+
+							//prepare message
+							console.error("from_address "+from_address)
+							let message = prepareMyWonAuctionOverview(auctions,from_address)
+
+							//send response
+							device.sendMessageToDevice(from_address, 'text', message);
+
+							steps[from_address] = 'mainMenu';
+						})
+					}, 1000)
+					break;			
 				default:
-					device.sendMessageToDevice(from_address, 'text', "No valid option here. Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)");
+					device.sendMessageToDevice(from_address, 'text', "No valid option here. What do you want to do? "+mainMenuText);
 					break;
 			}
 		}
@@ -119,7 +141,7 @@ eventBus.once('headless_wallet_ready', () => {
 			//start auction
 			device.sendMessageToDevice(from_address, 'text', "[create auction](byteball:" + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")");
 
-			steps[from_address] = 'buyOrSell';
+			steps[from_address] = 'mainMenu';
 		}
 	});
 
@@ -229,7 +251,58 @@ function prepareAuctionOverview(auctions) {
 
 	if (counter_running_auctions == 0 ) message = message + "-\n"
 
-	message += 	"Do something else: Buyer or Seller? [buyer](command:buyer) | [seller](command:seller)"
+	message += 	"Do something else? "+mainMenuText
+
+	return message;
+}
+
+function prepareMyWonAuctionOverview(auctions, buyerID) {
+	var message;
+	message = "You won the following auctions. For which one you want to confirm data received from the seller?:\n\n"
+
+	var my_auctions = 0
+
+	for (let k of Object.keys(auctions)) {
+
+		//only my auctions with status "holding"	
+		var auction_status = auctions[k]['auction_status']
+		console.error("auction_status "+ auction_status +"\n")
+		if (auction_status != 'holding') continue
+	
+		//TODO find out how to get the buyerID (it is not from_address!)
+		//var buyer = auctions[k]['buyer'].valueOf();
+		//console.error("buyer "+ buyer +"\n")
+		//console.error("buyerID "+ buyerID +"\n\n")
+		//if (buyerID != buyer) continue
+		
+		my_auctions += 1
+
+		// get interested data
+		var product_description = auctions[k]['product_description'].valueOf();
+		var timestamp = auctions[k]['timestamp'] + "000".valueOf();
+		var seller = auctions[k]['seller'].valueOf();
+
+		// create confirm link
+		var link_data = {
+			"buyer_data_confirm": "1",
+			"reference": k
+		}
+
+		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
+		let encodedbase64data = encodeURIComponent(base64data);
+		let confirmLink = "Confirm data received: [confirm](byteball:" + aa_addess + "?amount=10000" + "&base64data=" + encodedbase64data + ")"
+		console.error("buylink: " + confirmLink)
+
+		message += "**" + auctions[k]['product_description'] + "**\n"
+		message += "Bought from seller: " + seller + "\n"
+		message += "Auction finished time: " + timestamp + "\n"
+		message += confirmLink + "\n"
+		message += "---------------------------\n\n"
+	}
+
+	if (my_auctions == 0 ) message = message + "-\n"
+
+	message += 	"Do something else? "+mainMenuText
 
 	return message;
 }
