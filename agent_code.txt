@@ -126,7 +126,7 @@
                 }
             },
             { // buyer confirms data to seller sent
-                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.buyer_data_confirm AND var['auction.'||trigger.data.reference||'.auction_status'] == 'holding'}`,
+                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND !!trigger.data.buyer_data_confirm AND var['auction.'||trigger.data.reference||'.auction_status'] == 'holding'}`,
                 init: `{
                     $reference = trigger.data.reference;
                     $buyer = trigger.address;
@@ -149,12 +149,12 @@
                 ]
             },
             { // buyer confirms goods receipt
-                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                if: `{trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND !!trigger.data.goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
                 init: `{
-                    $reference = trigger.data.reference;
+                    $reference = trigger.data.reference  otherwise bounce ("reference is missing");
                     $seller = var['auction.'||trigger.data.reference||'.seller'];
-                    $comment = trigger.data.comment; 
-                    $voting = trigger.data.voting; //1-5
+                    $comment = trigger.data.comment otherwise bounce ("comment is missing");
+                    $voting = trigger.data.voting  otherwise bounce ("voting between 1 and 5 is missing"); //1-5
                     $comment_reference = sha256($reference || $seller || timestamp);
                 }`,
                 messages: [
@@ -180,12 +180,12 @@
                 ]
             },
             { // buyer did not receive goods
-                if: `{ trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND trigger.data.no_goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
+                if: `{ trigger.address == var['auction.'||trigger.data.reference||'.buyer'] AND !!trigger.data.no_goods_receipt AND var['auction.'||trigger.data.reference||'.auction_status'] == 'buyer_data_confirm'}`,
                 init: `{
-                    $reference = trigger.data.reference;
+                    $reference = trigger.data.reference  otherwise bounce ("reference is missing");
                     $seller = var['auction.'||trigger.data.reference||'.seller'];
-                    $comment = trigger.data.comment; 
-                    $voting = trigger.data.voting; //1-5
+                    $comment = trigger.data.comment otherwise bounce ("comment is missing");
+                    $voting = trigger.data.voting  otherwise bounce ("voting between 1 and 5 is missing"); //1-5
                     $comment_reference = sha256($reference || $seller || timestamp);
                 }`,
                 messages: [
