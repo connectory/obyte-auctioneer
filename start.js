@@ -9,13 +9,21 @@ const headlessWallet = require('headless-obyte');
 const objectHash = require('ocore/object_hash.js');
 const network = require("ocore/network");
 
+let auctions_bot_data = {} // store data while an auction is running (seller's pairing code)
 let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
 let aa_addess = "2EBQW3IICBBBXBQQX6CLTOH2CTUHGNSS"
 
-let mainMenuText= "\n -> [buy](command:buy) \n -> [sell](command:sell) \n -> [confirm data sent to seller](command:confirm_data_sent)"
+let mainMenuText= `
+-> [buy](command:buy)
+-> [sell](command:sell) 
+-> [send_pairing_code_to_seller](command:send_pairing_code_to_seller)
+-> [get_buyer_pairing_code](command:get_buyer_pairing_code)
+-> [confirm data sent to seller](command:confirm_data_sent)
+-> [finish an auction and vote](command:buyer_vote)
+`
 
 /**
  * headless wallet is ready
@@ -57,49 +65,134 @@ eventBus.once('headless_wallet_ready', () => {
 						network.requestFromLightVendor('light/get_aa_state_vars', {
 							address: aa_addess
 						}, (ws, request, response) => {
-
+		
 							//get auction data 
 							var auctions = getData(response)
-
+		
 							//prepare message
 							let message = prepareAuctionOverview(auctions)
-
+		
 							//send response
 							device.sendMessageToDevice(from_address, 'text', message);
-
+		
 							steps[from_address] = 'mainMenu';
 						})
-
-					}, 1000)
+		
+					}, 1000)	
 					break;
 				case 'sell':
 					device.sendMessageToDevice(from_address, 'text', "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)");
 					steps[from_address] = 'sell_description';
 					break;
+				case 'send_pairing_code_to_seller':
+						//TODO verify this is the buyer
+						device.sendMessageToDevice(from_address, 'text', "What is your pairing code (format: <auction_id>:<pairing code>)?");
+						steps[from_address] = 'send_pairing_code_to_seller_2';
+						break;	
+				case 'get_buyer_pairing_code':
+						//TODO verify this is the seller
+						device.sendMessageToDevice(from_address, 'text', "For which auction you want the seller's pairing code (auction id)?");
+						steps[from_address] = 'get_buyer_pairing_code_2';
+						break;							
 				case 'confirm_data_sent':
-					setTimeout(() => {
-						network.requestFromLightVendor('light/get_aa_state_vars', {
-							address: aa_addess
-						}, (ws, request, response) => {
-
-							//get auction data 
-							var auctions = getData(response)
-
-							//prepare message
-							console.error("from_address "+from_address)
-							let message = prepareMyWonAuctionOverview(auctions,from_address)
-
-							//send response
-							device.sendMessageToDevice(from_address, 'text', message);
-
-							steps[from_address] = 'mainMenu';
-						})
-					}, 1000)
-					break;			
+					device.sendMessageToDevice(from_address, 'text', "From which address did you pay? (Use the menu \"Insert my address\")");
+					steps[from_address] = 'confirm_data_sent_2';
+					break;
+				case 'buyer_vote':
+						device.sendMessageToDevice(from_address, 'text', `
+What is your voting? 
+(format: "<auction_id>:result:vote:comment")
+e.g.
+[<auction_id>:goods_received:4:Everything cool!](suggest-command:goods_received:4:Everything cool!) or
+[<auction_id>:no_goods_receipt:1:Never again.](suggest-command:no_goods_receipt:1:Never again.)
+						`);
+						steps[from_address] = 'buyer_vote_2';
+						break;											
 				default:
 					device.sendMessageToDevice(from_address, 'text', "No valid option here. What do you want to do? "+mainMenuText);
 					break;
 			}
+		}
+
+		//state machine: buyer_vote steps
+		else if (step === 'buyer_vote_2') {
+			let vote_raw = text.split(':')
+			let auction_id = vote_raw[0]
+			let goods_received_or_not = vote_raw[1]
+			let vote = vote_raw[2]
+			let comment = vote_raw[3]
+
+			// create vote link
+			var link_data;
+			if (goods_received_or_not == "goods_receipt") link_data = {
+				"reference": auction_id,
+				"goods_receipt": "1",
+				"voting": vote,
+				"comment": comment
+			}
+
+			else link_data = {
+				"reference": auction_id,
+				"no_goods_receipt": "1",
+				"voting": vote,
+				"comment": comment
+			}
+
+			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
+			let encodedbase64data = encodeURIComponent(base64data);
+			let message = "Use this Vote-Link now to send the vote: [link](byteball:" + aa_addess + "?amount=10000&base64data=" + encodedbase64data + ")"
+			console.error("voteLink: " + message)
+
+			message += 	"\n\nDo something else? "+mainMenuText
+
+			device.sendMessageToDevice(from_address, 'text', message);
+			steps[from_address] = 'mainMenu';
+		}
+
+		//state machine: get_buyer_pairing_code steps
+		else if (step === 'get_buyer_pairing_code_2') {
+			device.sendMessageToDevice(from_address, 'text', "The pairing code of the buyer is: "+auctions_bot_data[text]["buyer_pairing_code"]+"\n Do something else? "+mainMenuText);
+			steps[from_address] = 'mainMenu';
+		}
+
+		//state machine: send_pairing_code_to_seller steps
+		else if (step === 'send_pairing_code_to_seller_2') {
+			let pairingcode_raw = text.split(':')
+			let auctionID = pairingcode_raw[0]
+			let pairing_code = pairingcode_raw[1]
+
+			//TODO store in database
+			auctions_bot_data[auctionID] = {"buyer_pairing_code": pairing_code}
+			console.error("pairing code read :" + auctions_bot_data[auctionID]["buyer_pairing_code"] )
+
+			device.sendMessageToDevice(from_address, 'text', "Do something else? "+mainMenuText);
+			steps[from_address] = 'mainMenu';
+		}
+
+	    //state machine: confirm_data_sent steps
+		else if (step === 'confirm_data_sent_2') {
+			let buyer_address = text
+			//TODO sent the user a challenge to verify the address is really from him
+			//see https://developer.obyte.org/verifying-address-with-signed-message
+
+			setTimeout(() => {
+				network.requestFromLightVendor('light/get_aa_state_vars', {
+					address: aa_addess
+				}, (ws, request, response) => {
+
+					//get auction data 
+					var auctions = getData(response)
+
+					//prepare message
+					console.error("from_address "+from_address)
+					let message = prepareMyWonAuctionOverview(auctions, buyer_address)
+
+					//send response
+					device.sendMessageToDevice(from_address, 'text', message);
+
+					steps[from_address] = 'mainMenu';
+				})
+			}, 1000)
 		}
 
 		//state machine: sell steps
@@ -245,6 +338,7 @@ function prepareAuctionOverview(auctions) {
 
 		message += "**" + auctions[k]['product_description'] + "**\n"
 		message += "Current_price: " + current_price + "\n"
+		message += "Auction ID: " + k + "\n"
 		message += buylink + "\n"
 		message += "---------------------------\n\n"
 	}
@@ -264,16 +358,16 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 
 	for (let k of Object.keys(auctions)) {
 
-		//only my auctions with status "holding"	
+		//only  auctions with status "holding"	
 		var auction_status = auctions[k]['auction_status']
 		console.error("auction_status "+ auction_status +"\n")
 		if (auction_status != 'holding') continue
 	
-		//TODO find out how to get the buyerID (it is not from_address!)
-		//var buyer = auctions[k]['buyer'].valueOf();
-		//console.error("buyer "+ buyer +"\n")
-		//console.error("buyerID "+ buyerID +"\n\n")
-		//if (buyerID != buyer) continue
+		//only auction from where the user is buyer
+		var buyer = auctions[k]['buyer'].valueOf();
+		console.error("buyer "+ buyer +"\n")
+		console.error("buyerID "+ buyerID +"\n\n")
+		if (buyerID.toUpperCase().trim() != buyer.toUpperCase().trim()) continue
 		
 		my_auctions += 1
 
@@ -300,7 +394,7 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 		message += "---------------------------\n\n"
 	}
 
-	if (my_auctions == 0 ) message = message + "-\n"
+	if (my_auctions == 0 ) message = message + "-\n\n---------------------------\n\n"
 
 	message += 	"Do something else? "+mainMenuText
 
