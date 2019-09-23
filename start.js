@@ -14,7 +14,7 @@ let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
-let aa_addess = "SQVR4BJXHYCFTFQOBC65PRAFJVBBEM2L"
+let aa_addess = "YLXZWAC4RTHULNP7ZOWQPUGA5IZD5GGT"
 
 let mainMenuText = `
 -> [buy](command:buy)
@@ -29,8 +29,8 @@ let voteText = `
 What is your voting? 
 (format: "<auction_id>:result:vote:comment")
 e.g.
-[<auction_id>:goods_received:4:Everything cool!](suggest-command:goods_received:4:Everything cool!) or
-[<auction_id>:no_goods_receipt:1:Never again.](suggest-command:no_goods_receipt:1:Never again.)
+[<auction_id>:goods_receipt:4:Everything cool!](suggest-command:<auction_id>:goods_receipt:4:Everything cool!) or
+[<auction_id>:no_goods_receipt:1:Never again.](suggest-command:<auction_id>:no_goods_receipt:1:Never again.)
 						`
 
 /**
@@ -52,7 +52,7 @@ eventBus.once('headless_wallet_ready', () => {
 	 * user sends message to the bot
 	 */
 	eventBus.on('text', (from_address, text) => {
-		text = text.trim().toLowerCase();
+		text = text.trim();
 
 		// initialize state machine
 		if (!steps[from_address]) steps[from_address] = 'start';
@@ -67,7 +67,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 			//state machine: mainMenu	
 		} else if (step === 'mainMenu') {
-			switch (text) {
+			switch (text.toLowerCase()) {
 				case 'buy':
 					setTimeout(() => {
 						network.requestFromLightVendor('light/get_aa_state_vars', {
@@ -142,7 +142,6 @@ eventBus.once('headless_wallet_ready', () => {
 			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
 			let encodedbase64data = encodeURIComponent(base64data);
 			let message = "Use this Vote-Link now to send the vote: [link](byteball:" + aa_addess + "?amount=10000&base64data=" + encodedbase64data + ")"
-			console.error("voteLink: " + message)
 
 			message += "\n\nDo something else? " + mainMenuText
 
