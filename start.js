@@ -17,21 +17,13 @@ let sellTempData = {}; // store seller's temp product data
 let aa_addess = "YLXZWAC4RTHULNP7ZOWQPUGA5IZD5GGT"
 
 let mainMenuText = `
--> [buy](command:buy)
--> [sell](command:sell) 
--> [send_pairing_code_to_seller](command:send_pairing_code_to_seller)
--> [get_buyer_pairing_code](command:get_buyer_pairing_code)
--> [confirm data sent to seller](command:confirm_data_sent)
--> [finish an auction and vote](command:buyer_vote)
+-> [Buy something](command:buy)
+-> [Sell something](command:sell) 
+-> [Get in contact with seller](command:send_pairing_code_to_seller)
+-> [Get in contact with buyer](command:get_buyer_pairing_code)
+-> [Confirm data sent to seller](command:confirm_data_sent)
+-> [Vote (as buyer)](command:buyer_vote)
 `
-
-let voteText = `
-What is your voting? 
-(format: "<auction_id>:result:vote:comment")
-e.g.
-[<auction_id>:goods_receipt:4:Everything cool!](suggest-command:<auction_id>:goods_receipt:4:Everything cool!) or
-[<auction_id>:no_goods_receipt:1:Never again.](suggest-command:<auction_id>:no_goods_receipt:1:Never again.)
-						`
 
 /**
  * headless wallet is ready
@@ -45,7 +37,7 @@ eventBus.once('headless_wallet_ready', () => {
 	eventBus.on('paired', (from_address, pairing_secret) => {
 		// send a geeting message
 		const device = require('ocore/device.js');
-		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Press [start](command:start) to start");
+		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Type [menu](command:menu) to start\n(With this command you always get back to the main menu)");
 	});
 
 	/**
@@ -60,12 +52,12 @@ eventBus.once('headless_wallet_ready', () => {
 
 		const device = require('ocore/device.js');
 
-		//state machine: start
-		if (step === 'start') {
+		//state machine: start or "menu" typed
+		if (text.toLowerCase() == "menu" || step === 'start') {
 			device.sendMessageToDevice(from_address, 'text', "What do you want to do? " + mainMenuText);
 			steps[from_address] = 'mainMenu';
 
-			//state machine: mainMenu	
+		//state machine: mainMenu	
 		} else if (step === 'mainMenu') {
 			switch (text.toLowerCase()) {
 				case 'buy':
@@ -92,7 +84,7 @@ eventBus.once('headless_wallet_ready', () => {
 					break;
 				case 'send_pairing_code_to_seller':
 					//TODO verify this is the buyer
-					device.sendMessageToDevice(from_address, 'text', "What is your pairing code (format: <auction_id>:<pairing code>)?");
+					device.sendMessageToDevice(from_address, 'text', "What is the ID of the auction?");
 					steps[from_address] = 'send_pairing_code_to_seller_2';
 					break;
 				case 'get_buyer_pairing_code':
@@ -105,7 +97,7 @@ eventBus.once('headless_wallet_ready', () => {
 					steps[from_address] = 'confirm_data_sent_2';
 					break;
 				case 'buyer_vote':
-					device.sendMessageToDevice(from_address, 'text', voteText);
+					device.sendMessageToDevice(from_address, 'text', "For which auction you want to vote (auction id)?");
 					steps[from_address] = 'buyer_vote_2';
 					break;
 				default:
@@ -117,26 +109,43 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: buyer_vote steps
 		else if (step === 'buyer_vote_2') {
-			let vote_raw = text.split(':')
-			let auction_id = vote_raw[0]
-			let goods_received_or_not = vote_raw[1]
-			let vote = vote_raw[2]
-			let comment = vote_raw[3]
+			sellTempData[from_address] = { "reference": text }
+
+			device.sendMessageToDevice(from_address, 'text', "Did you receive the goods? [Yes](command:yes) | [No](command:no)");
+			steps[from_address] = 'buyer_vote_3';
+		}
+				
+		else if (step === 'buyer_vote_3') {
+			sellTempData[from_address]["goodReceived"] =  text
+
+			device.sendMessageToDevice(from_address, 'text', "What is your voting? [very good](command:5) | [good](command:4) | [neutral](command:3) | [bad](command:2) | [very bad](command:1)");
+			steps[from_address] = 'buyer_vote_4';
+		}
+
+		else if (step === 'buyer_vote_4') {
+			sellTempData[from_address]["voting"] =  text
+
+			device.sendMessageToDevice(from_address, 'text', "What is your comment? [Everything fine, thanks.](suggest-command:Everything fine, thanks.)");
+			steps[from_address] = 'buyer_vote_5';
+		}
+
+		else if (step === 'buyer_vote_5') {
+			sellTempData[from_address]["comment"] =  text
 
 			// create vote link
 			var link_data;
-			if (goods_received_or_not == "goods_receipt") link_data = {
-				"reference": auction_id,
+			if (sellTempData[from_address]["goodReceived"]  == "yes") link_data = {
+				"reference": sellTempData[from_address]["reference"],
 				"goods_receipt": "1",
-				"voting": vote,
-				"comment": comment
+				"voting": sellTempData[from_address]["voting"],
+				"comment": sellTempData[from_address]["comment"]
 			}
 
 			else link_data = {
-				"reference": auction_id,
+				"reference": sellTempData[from_address]["reference"],
 				"no_goods_receipt": "1",
-				"voting": vote,
-				"comment": comment
+				"voting": sellTempData[from_address]["voting"],
+				"comment": sellTempData[from_address]["comment"]
 			}
 
 			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
@@ -151,18 +160,23 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: get_buyer_pairing_code steps
 		else if (step === 'get_buyer_pairing_code_2') {
-			device.sendMessageToDevice(from_address, 'text', "The pairing code of the buyer is: " + auctions_bot_data[text]["buyer_pairing_code"] + "\n Do something else? " + mainMenuText);
+			device.sendMessageToDevice(from_address, 'text', "The pairing code of the buyer is: " + auctions_bot_data[text]["buyer_pairing_code"] + "\n\n Do something else? " + mainMenuText);
 			steps[from_address] = 'mainMenu';
 		}
 
 		//state machine: send_pairing_code_to_seller steps
 		else if (step === 'send_pairing_code_to_seller_2') {
-			let pairingcode_raw = text.split(':')
-			let auctionID = pairingcode_raw[0]
-			let pairing_code = pairingcode_raw[1]
+			sellTempData[from_address] = { "auctionID": text }
 
-			//TODO store in database
-			auctions_bot_data[auctionID] = { "buyer_pairing_code": pairing_code }
+			device.sendMessageToDevice(from_address, 'text', "What is your pairing code?");
+			steps[from_address] = 'send_pairing_code_to_seller_3';
+		}
+
+		else if (step === 'send_pairing_code_to_seller_3') {
+			let auctionID = sellTempData[from_address]["auctionID"]
+
+			//TODO store in database instead
+			auctions_bot_data[auctionID] = { "buyer_pairing_code": text }
 			console.error("pairing code read :" + auctions_bot_data[auctionID]["buyer_pairing_code"])
 
 			device.sendMessageToDevice(from_address, 'text', "Do something else? " + mainMenuText);
@@ -324,7 +338,7 @@ function prepareAuctionOverview(auctions) {
 		message += "---------------------------\n\n"
 	}
 
-	if (counter_running_auctions == 0) message = message + "-\n"
+	if (counter_running_auctions == 0) message = message + "-\n\n"
 
 	message += "Do something else? " + mainMenuText
 
