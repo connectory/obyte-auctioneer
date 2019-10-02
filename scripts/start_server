@@ -1,0 +1,3 @@
+#!/bin/bash
+nohup echo -ne 't\n' | node start.js &
+
