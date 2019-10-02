@@ -1,3 +1,3 @@
 #!/bin/bash
-nohup echo -ne 't\n' | node start.js &
-
+npm install
+nohup echo -ne 't\n' | node /var/www/start.js &
