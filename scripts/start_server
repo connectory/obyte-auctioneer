@@ -1,4 +1,4 @@
 #!/bin/bash
-/var/app/
+cd /var/app/
 npm install
 nohup echo -ne 't\n' | node start.js &
