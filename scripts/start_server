@@ -1,4 +1,7 @@
 #!/bin/bash
 cd /var/app/
+
+#might take some time
 npm install
+
 nohup echo -ne 't\n' | node start.js &
