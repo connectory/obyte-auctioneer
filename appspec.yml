@@ -8,6 +8,7 @@ hooks:
     - location: scripts/install_dependencies
       timeout: 300
       runas: root
+  AfterInstall:    
     - location: scripts/start_server
       timeout: 3000
       runas: root
