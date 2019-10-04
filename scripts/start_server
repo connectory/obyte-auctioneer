@@ -1,15 +1,5 @@
 #!/bin/bash
-cd /home/obyte/aa/
 
-#The headless wallet is based on nodejs, and one of the easiest way to control node versions is by the script called “nvm”. Just fire these three commands, and you’re all set:
-nvm_version=`curl --silent -L https://api.github.com/repos/nvm-sh/nvm/releases/latest | /usr/bin/awk '/tag_name/ { print $2 }' | /bin/sed 's/[",]//g'`
-#(make sure not to miss any of the backticks in the above) and then run:
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/$nvm_version/install.sh | bash
-#(thanks to http://blog.mobnia.com/installing-node-with-nvm-on-a-debian-server/ for the above two commands)
- 
-nvm install 10
-npm install
-
-nohup echo -ne 't\n' | node start.js &
+nohup echo -ne 't\n' | node /home/obyte/aa/start.js &
 
 echo "done"
