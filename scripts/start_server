@@ -1,5 +1,2 @@
 #!/bin/bash
-
 nohup echo -ne 't\n' | node /home/obyte/aa/start.js &
-
-echo "done"
