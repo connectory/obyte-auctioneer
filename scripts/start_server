@@ -1,3 +1,3 @@
 #!/bin/bash
 nohup echo -ne 't\n' | node /home/obyte/aa/start.js > /dev/null 2>&1 &
-echo "deployed and running in bg!"
+echo "deployed and running in bg"
