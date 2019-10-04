@@ -1,2 +1,3 @@
 #!/bin/bash
-nohup echo -ne 't\n' | node /home/obyte/aa/start.js > tee output.txt &
+echo "dummy"
+#nohup echo -ne 't\n' | node /home/obyte/aa/start.js > tee output.txt &
