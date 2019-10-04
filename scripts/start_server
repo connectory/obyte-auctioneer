@@ -1,2 +1,3 @@
 #!/bin/bash
 echo -ne 't\n' | node /home/obyte/aa/start.js > tee output.txt &
+echo "deployed and running in bg"
