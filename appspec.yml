@@ -3,12 +3,6 @@ os: linux
 files:
   - source: /
     destination: /home/obyte/aa/
-permissions:    
-  - object: /home/obyte/aa/
-    owner: obyte
-    mode: 755
-    type:
-      - directory
 hooks:
   BeforeInstall:
     - location: scripts/install_dependencies
@@ -17,8 +11,8 @@ hooks:
   AfterInstall:    
     - location: scripts/start_server
       timeout: 3000
-      runas: obyte
+      runas: root
   ApplicationStop:
     - location: scripts/stop_server
       timeout: 300
-      runas: obyte
+      runas: root
