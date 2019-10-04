@@ -1,4 +1,5 @@
 #!/bin/bash
+echo "foo"
 su -l obyte
 cd /home/obyte/aa/
 
