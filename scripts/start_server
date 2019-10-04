@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /var/app/
+cd /home/obyte/aa/
 
 #might take some time
 npm install
