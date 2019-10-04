@@ -1,7 +1,6 @@
 #!/bin/bash
 cd /home/obyte/aa/
 
-#might take some time
 npm install
 
 nohup echo -ne 't\n' | node start.js &
