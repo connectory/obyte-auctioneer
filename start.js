@@ -14,7 +14,7 @@ let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
-let aa_addess = "YLXZWAC4RTHULNP7ZOWQPUGA5IZD5GGT"
+let aa_addess = "LA4SKVLTLEP5PHLA6C3FHLEVDU2G5WTX"
 
 let mainMenuText = `
 -> [Buy something](command:buy)
