@@ -16,12 +16,39 @@ let sellTempData = {}; // store seller's temp product data
 //the address of the a. agent
 let aa_addess = "ZWYXC4IMHDA7FM7HWUDKFD7TPDCSNLOD"
 
-let mainMenuText = `
+//Messages
+const message_mainMenuText = `
 -> [Buy something](command:buy)
 -> [Sell something](command:sell) 
 -> [Confirm data sent to seller](command:confirm_data_sent)
 -> [Vote (as buyer)](command:buyer_vote)
 `
+const message_welcome = "Welcome to the autonomous auctioneer! Type [menu](command:menu) to start\n(With this command you always get back to the main menu)";
+const message_mainMenuDoSomethingElsePrefix = "\n\nDo something else? ";
+const message_mainMenuPrefix = "What do you want to do? ";
+const message_NoValidOption = "No valid option here. What do you want to do? ";
+
+const message_ConfirmWhichAddress = "From which address did you pay? (Use the menu \"Insert my address\")";
+
+const message_VoteWhichAuction = "For which auction you want to vote (auction id)?";
+const message_VoteGoodsReceived = "Did you receive the goods? [Yes](command:yes) | [No](command:no)";
+const message_VoteWhatIsYourVote = "What is your voting? [very good](command:5) | [good](command:4) | [neutral](command:3) | [bad](command:2) | [very bad](command:1)";
+const message_VoteWhatIsYourComment = "What is your comment? [Everything fine, thanks.](suggest-command:Everything fine, thanks.)";
+const message_VoteUsedThisVoteLink = "Use this Vote-Link now to send the vote: [link](byteball:";
+
+const message_SellPairingCode = "What is your pairing code? (It will be encrypted with the seller's public key before publishing it.)";
+const message_SellDescription = "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)";
+const message_SellStartPrice = "Which price to start with? e.g. [500](suggest-command:500)";
+const message_SellLowestPrice = "Which is the lowest price you want? e.g. [100](suggest-command:100)";
+const message_SellPriceSteps = "Which price steps to use? e.g. [50](suggest-command:50)";
+const message_SellTimeSteps = "Which time steps to use? e.g. [3600](suggest-command:3600)";
+const message_SellEncryptAlgo = "Which type of asymetric encryption do you want to use for the pairing key exchange? Currently only [AES](command:AES) supported by the bot.";
+const message_SellPublicKey = "What is your public key (to be used by the buyer to encrypt the pairing key)?";
+const message_SellStartAuction = "Used this payment link to start the auction: [create auction](byteball:";
+
+const message_BuyYouWonTheFollowinAuctions = "You won the following auctions. For which one you want to confirm that you have sent your data to the seller?:\n\n";
+const message_BuyBidForProductPrefix = "Bid for product: [bid for product](byteball:";
+const message_BuyOverview = "The following auctions are currently running. Click to bid:\n\n";
 
 /**
  * headless wallet is ready
@@ -35,7 +62,7 @@ eventBus.once('headless_wallet_ready', () => {
 	eventBus.on('paired', (from_address, pairing_secret) => {
 		// send a geeting message
 		const device = require('ocore/device.js');
-		device.sendMessageToDevice(from_address, 'text', "Welcome to the autonomous auctioneer! Type [menu](command:menu) to start\n(With this command you always get back to the main menu)");
+		device.sendMessageToDevice(from_address, 'text', message_welcome);
 	});
 
 	/**
@@ -52,31 +79,31 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: start or "menu" typed
 		if (text.toLowerCase() == "menu" || step === 'start') {
-			device.sendMessageToDevice(from_address, 'text', "What do you want to do? " + mainMenuText);
+			device.sendMessageToDevice(from_address, 'text', message_mainMenuPrefix + message_mainMenuText);
 			steps[from_address] = 'mainMenu';
 
 		//state machine: mainMenu	
 		} else if (step === 'mainMenu') {
 			switch (text.toLowerCase()) {
 				case 'buy':
-					device.sendMessageToDevice(from_address, 'text', "What is your pairing code? (It will be encrypted with the seller's public key before publishing it.)");
+					device.sendMessageToDevice(from_address, 'text', message_SellPairingCode);
 					steps[from_address] = 'buyer_pairing_code';
 					break;
 				case 'sell':
-					device.sendMessageToDevice(from_address, 'text', "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)");
+					device.sendMessageToDevice(from_address, 'text', message_SellDescription);
 					steps[from_address] = 'sell_description';
 					break;
 				case 'confirm_data_sent':
-					device.sendMessageToDevice(from_address, 'text', "From which address did you pay? (Use the menu \"Insert my address\")");
+					device.sendMessageToDevice(from_address, 'text', message_ConfirmWhichAddress);
 					steps[from_address] = 'confirm_data_sent_2';
 					break;
 				case 'buyer_vote':
-					device.sendMessageToDevice(from_address, 'text', "For which auction you want to vote (auction id)?");
+					device.sendMessageToDevice(from_address, 'text', message_VoteWhichAuction);
 					steps[from_address] = 'buyer_vote_2';
 					break;
 				default:
 					steps[from_address] = 'mainMenu';
-					device.sendMessageToDevice(from_address, 'text', "No valid option here. What do you want to do? " + mainMenuText);
+					device.sendMessageToDevice(from_address, 'text', message_NoValidOption + message_mainMenuText);
 					break;
 			}
 		}
@@ -108,21 +135,21 @@ eventBus.once('headless_wallet_ready', () => {
 		else if (step === 'buyer_vote_2') {
 			sellTempData[from_address] = { "reference": text }
 
-			device.sendMessageToDevice(from_address, 'text', "Did you receive the goods? [Yes](command:yes) | [No](command:no)");
+			device.sendMessageToDevice(from_address, 'text', message_VoteGoodsReceived);
 			steps[from_address] = 'buyer_vote_3';
 		}
 				
 		else if (step === 'buyer_vote_3') {
 			sellTempData[from_address]["goodReceived"] =  text
 
-			device.sendMessageToDevice(from_address, 'text', "What is your voting? [very good](command:5) | [good](command:4) | [neutral](command:3) | [bad](command:2) | [very bad](command:1)");
+			device.sendMessageToDevice(from_address, 'text', message_VoteWhatIsYourVote);
 			steps[from_address] = 'buyer_vote_4';
 		}
 
 		else if (step === 'buyer_vote_4') {
 			sellTempData[from_address]["voting"] =  text
 
-			device.sendMessageToDevice(from_address, 'text', "What is your comment? [Everything fine, thanks.](suggest-command:Everything fine, thanks.)");
+			device.sendMessageToDevice(from_address, 'text', message_VoteWhatIsYourComment);
 			steps[from_address] = 'buyer_vote_5';
 		}
 
@@ -147,9 +174,9 @@ eventBus.once('headless_wallet_ready', () => {
 
 			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
 			let encodedbase64data = encodeURIComponent(base64data);
-			let message = "Use this Vote-Link now to send the vote: [link](byteball:" + aa_addess + "?amount=10000&base64data=" + encodedbase64data + ")"
+			let message = message_VoteUsedThisVoteLink + aa_addess + "?amount=10000&base64data=" + encodedbase64data + ")"
 
-			message += "\n\nDo something else? " + mainMenuText
+			message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
 			device.sendMessageToDevice(from_address, 'text', message);
 			steps[from_address] = 'mainMenu';
@@ -184,42 +211,42 @@ eventBus.once('headless_wallet_ready', () => {
 			sellTempData[from_address] = { "seller": "true" }
 			sellTempData[from_address]['product_description'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which price to start with? e.g. [500](suggest-command:500)");
+			device.sendMessageToDevice(from_address, 'text', message_SellStartPrice);
 			steps[from_address] = 'sell_startprice';
 		}
 
 		else if (step === 'sell_startprice') {
 			sellTempData[from_address]['start_price'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which is the lowest price you want? e.g. [100](suggest-command:100)");
+			device.sendMessageToDevice(from_address, 'text', message_SellLowestPrice);
 			steps[from_address] = 'sell_lowestprice';
 		}
 
 		else if (step === 'sell_lowestprice') {
 			sellTempData[from_address]['lowest_price'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which price steps to use? e.g. [50](suggest-command:50)");
+			device.sendMessageToDevice(from_address, 'text', message_SellPriceSteps);
 			steps[from_address] = 'sell_pricesteps';
 		}
 
 		else if (step === 'sell_pricesteps') {
 			sellTempData[from_address]['price_steps'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which time steps to use? e.g. [3600](suggest-command:3600)");
+			device.sendMessageToDevice(from_address, 'text', message_SellTimeSteps);
 			steps[from_address] = 'sell_timesteps';
 		}
 
 		else if (step === 'sell_timesteps') {
 			sellTempData[from_address]['time_steps'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which type of asymetric encryption do you want to use for the pairing key exchange? e.g. Currently only [AES] supported by the bot (command:AES)");
+			device.sendMessageToDevice(from_address, 'text', message_SellEncryptAlgo);
 			steps[from_address] = 'sell_encryption_algo';
 		}
 
 		else if (step === 'sell_encryption_algo') {
 			sellTempData[from_address]['encryptionAlgorithm'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "What is your public key (to be used by the buyer to encrypt the pairing key)?");
+			device.sendMessageToDevice(from_address, 'text', message_SellPublicKey);
 			steps[from_address] = 'sell_startAuction';
 		}
 
@@ -230,8 +257,8 @@ eventBus.once('headless_wallet_ready', () => {
 			let encodedbase64data = encodeURIComponent(base64data);
 
 			//start auction
-			let message = "Used this payment link to start the auction: [create auction](byteball:" + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
-			message += "\n\nDo something else? " + mainMenuText
+			let message = message_SellStartAuction + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
+			message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 			device.sendMessageToDevice(from_address, 'text', message);
 			steps[from_address] = 'mainMenu';
 		}
@@ -279,7 +306,7 @@ function getData(auctions_flat) {
 function prepareAuctionOverview(auctions, pairing_code) {
 	var message;
 
-	message = "The following auctions are currently running. Click to bid:\n\n"
+	message = message_BuyOverview
 
 	var counter_running_auctions = 0
 
@@ -319,7 +346,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 
 		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
 		let encodedbase64data = encodeURIComponent(base64data);
-		let buylink = "Bid for product: [bid for product](byteball:" + aa_addess + "?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
+		let buylink = message_BuyBidForProductPrefix + aa_addess + "?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
 		console.error("buylink: " + buylink)
 
 		message += "**" + auctions[k]['product_description'] + "**\n"
@@ -331,7 +358,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 
 	if (counter_running_auctions == 0) message = message + "-\n\n"
 
-	message += "Do something else? " + mainMenuText
+	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
 	return message;
 }
@@ -364,7 +391,7 @@ function encryptText(text, public_key){
 
 function prepareMyWonAuctionOverview(auctions, buyerID) {
 	var message;
-	message = "You won the following auctions. For which one you want to confirm that you have sent your data to the seller?:\n\n"
+	message = message_BuyYouWonTheFollowinAuctions
 
 	var my_auctions = 0
 
@@ -408,7 +435,7 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 
 	if (my_auctions == 0) message = message + "-\n\n---------------------------\n\n"
 
-	message += "Do something else? " + mainMenuText
+	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
 	return message;
 }
