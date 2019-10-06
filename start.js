@@ -205,26 +205,26 @@ eventBus.once('headless_wallet_ready', () => {
 		else if (step === 'sell_pricesteps') {
 			sellTempData[from_address]['price_steps'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which type of asymetric encryption do you want to use for the pairing key exchange? e.g. [AES](command:AES)");
+			device.sendMessageToDevice(from_address, 'text', "Which time steps to use? e.g. [3600](suggest-command:3600)");
+			steps[from_address] = 'sell_timesteps';
+		}
+
+		else if (step === 'sell_timesteps') {
+			sellTempData[from_address]['time_steps'] = text;
+
+			device.sendMessageToDevice(from_address, 'text', "Which type of asymetric encryption do you want to use for the pairing key exchange? e.g. Currently only [AES] supported by the bot (command:AES)");
 			steps[from_address] = 'sell_encryption_algo';
 		}
 
 		else if (step === 'sell_encryption_algo') {
 			sellTempData[from_address]['encryptionAlgorithm'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "What is your public key - to be used by the buyer to encrypt the pairing key?");
-			steps[from_address] = 'sell_public_key';
-		}
-
-		else if (step === 'sell_public_key') {
-			sellTempData[from_address]['public_key'] = text;
-
-			device.sendMessageToDevice(from_address, 'text', "Which time steps to use? e.g. [3600](suggest-command:3600)");
+			device.sendMessageToDevice(from_address, 'text', "What is your public key (to be used by the buyer to encrypt the pairing key)?");
 			steps[from_address] = 'sell_startAuction';
 		}
 
 		else if (step === 'sell_startAuction') {
-			sellTempData[from_address]['time_steps'] = text;
+			sellTempData[from_address]['public_key'] = text;
 
 			let base64data = Buffer.from(JSON.stringify(sellTempData[from_address])).toString('base64');
 			let encodedbase64data = encodeURIComponent(base64data);
