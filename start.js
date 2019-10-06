@@ -91,7 +91,7 @@ eventBus.once('headless_wallet_ready', () => {
 		const device = require('ocore/device.js');
 
 		//state machine: mainMenu	
-		if (step === 'mainMenu') {
+		if (text.toLowerCase() == "menu" || step === 'mainMenu') {
 			switch (text.toLowerCase()) {
 				case 'bid':
 					device.sendMessageToDevice(from_address, 'text', message_SellPairingCode);
