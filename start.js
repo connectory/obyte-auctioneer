@@ -14,7 +14,7 @@ let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
-let aa_addess = "LA4SKVLTLEP5PHLA6C3FHLEVDU2G5WTX"
+let aa_addess = "ZWYXC4IMHDA7FM7HWUDKFD7TPDCSNLOD"
 
 let mainMenuText = `
 -> [Buy something](command:buy)
@@ -59,7 +59,7 @@ eventBus.once('headless_wallet_ready', () => {
 		} else if (step === 'mainMenu') {
 			switch (text.toLowerCase()) {
 				case 'buy':
-					device.sendMessageToDevice(from_address, 'text', "What is your (encrypted) pairing code?");
+					device.sendMessageToDevice(from_address, 'text', "What is your pairing code? (It will be encrypted with the seller's public key before publishing it.)");
 					steps[from_address] = 'buyer_pairing_code';
 					break;
 				case 'sell':
@@ -205,7 +205,7 @@ eventBus.once('headless_wallet_ready', () => {
 		else if (step === 'sell_pricesteps') {
 			sellTempData[from_address]['price_steps'] = text;
 
-			device.sendMessageToDevice(from_address, 'text', "Which type of asymetric encryption do you want to use for the pairing key exchange? e.g. [Secure Shell (SSH), RFC_4716](suggest-command:RFC_4716)");
+			device.sendMessageToDevice(from_address, 'text', "Which type of asymetric encryption do you want to use for the pairing key exchange? e.g. [AES](command:AES)");
 			steps[from_address] = 'sell_encryption_algo';
 		}
 
@@ -307,11 +307,14 @@ function prepareAuctionOverview(auctions, pairing_code) {
 		//add 10000 for fees
 		current_price = parseInt(current_price) + 10000
 
+		//encrypt
+		var encr_pairing_code = encryptText(pairing_code, auctions[k]['public_key'].valueOf())
+
 		// create buy link
 		var link_data = {
 			"buyer": "1",
 			"reference": k,
-			"pairing_code" : pairing_code
+			"pairing_code" : encr_pairing_code
 		}
 
 		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
@@ -331,6 +334,32 @@ function prepareAuctionOverview(auctions, pairing_code) {
 	message += "Do something else? " + mainMenuText
 
 	return message;
+}
+
+function encryptText(text, public_key){
+	//see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
+
+	/*
+	var crypto = require("crypto");
+	var path = require("path");
+	var fs = require("fs");
+
+	//TODO use give key, not dummy key
+	var absolutePath = path.resolve("./res/public.pem");
+	var publicKey = fs.readFileSync(absolutePath, "utf8");
+	
+    var buffer = new Buffer(text);
+	var encrypted = crypto.publicEncrypt(    {
+        key: publicKey,
+        padding: constants.RSA_NO_PADDING 
+	}, buffer);
+	
+	
+	return encrypted.toString("base64");
+	*/
+
+	//TODO encrypt with public key
+	return ("dummy encrypted pairing code, encrypted with \""+public_key+"\"")
 }
 
 function prepareMyWonAuctionOverview(auctions, buyerID) {
@@ -383,3 +412,33 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 
 	return message;
 }
+
+/*
+//generate dummy key pair
+
+const { writeFileSync } = require('fs')
+const { generateKeyPairSync } = require('crypto')
+
+function generateKeys() {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', 
+    {
+            modulusLength: 4096,
+            namedCurve: 'secp256k1', 
+            publicKeyEncoding: {
+                type: 'spki',
+                format: 'pem'     
+            },     
+            privateKeyEncoding: {
+                type: 'pkcs8',
+                format: 'pem',
+                cipher: 'aes-256-cbc',
+                passphrase: "gehein"
+            } 
+    });
+
+    writeFileSync('private.pem', privateKey)
+    writeFileSync('public.pem', publicKey)
+}
+
+generateKeys();
+*/

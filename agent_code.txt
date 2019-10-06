@@ -22,7 +22,7 @@
                     $product_description = trigger.data.product_description otherwise bounce ("product description is missing");
                     $product_url = trigger.data.product_url;
 					$public_key = trigger.data.public_key;
-					$encryptionAlgorithm = "{trigger.data.encryptionAlgorithm otherwise 'PLAIN'}";
+					$encryptionAlgorithm = trigger.data.encryptionAlgorithm otherwise bounce ("the asymetric encryption to be used for the pairing key exchange, e.g. \"AES\". Use \"NONE\" if the pairing key should be stored in plain text (not recommended)");
                     $auction_status = 'running';
 
                     $reference = sha256($seller || $start_price || $lowest_price || $time_steps || $price_steps || $product_description || $auction_status || timestamp);
