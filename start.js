@@ -14,7 +14,7 @@ let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
 //the address of the a. agent
-let aa_addess = "ZWYXC4IMHDA7FM7HWUDKFD7TPDCSNLOD"
+let aa_addess = "6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF"
 
 //Messages
 const message_mainMenuText = `
@@ -37,7 +37,6 @@ You can always type menu to get back to the main menu.
 
 const message_mainMenuDoSomethingElsePrefix = "\n\nDo something else? ";
 const message_mainMenuPrefix = "What do you want to do? ";
-const message_NoValidOption = "No valid option here. What do you want to do? ";
 
 const message_ConfirmWhichAddress = "From which address do your transactions? (Use the menu \"Insert my address\")";
 
@@ -62,6 +61,8 @@ const message_BuyYouWonTheFollowinAuctions = "You won the following auctions. Fo
 const message_BuyYouCanVoteForTheFollowinAuctions = "You can rate for the following auctions: \n";
 const message_BuyBidForProductPrefix = "Bid for product: [bid for product](byteball:";
 const message_BuyOverview = "The following auctions are currently running. Click to bid:\n";
+
+const message_NotAValidKey = "Not a valid public key, please create a new keypair and paste the public key again.";
 
 /**
  * headless wallet is ready
@@ -93,7 +94,7 @@ eventBus.once('headless_wallet_ready', () => {
 		//state machine: mainMenu	
 		if (text.toLowerCase() == "menu" || step === 'mainMenu') {
 			switch (text.toLowerCase()) {
-				case 'bid':
+				case 'bid':					
 					device.sendMessageToDevice(from_address, 'text', message_SellPairingCode);
 					steps[from_address] = 'buyer_pairing_code';
 					break;
@@ -133,7 +134,6 @@ eventBus.once('headless_wallet_ready', () => {
 					var auctions = getData(response)
 
 					//prepare message
-					console.error("from_address " + from_address)
 					let message = prepareMyConfirmedAuctionOverviewAsSeller(auctions, buyer_address)
 
 					//send response
@@ -180,7 +180,6 @@ eventBus.once('headless_wallet_ready', () => {
 					var auctions = getData(response)
 
 					//prepare message
-					console.error("from_address " + from_address)
 					let message = prepareMyConfirmedAuctionOverview(auctions, buyer_address)
 
 					//send response
@@ -254,7 +253,6 @@ eventBus.once('headless_wallet_ready', () => {
 					var auctions = getData(response)
 
 					//prepare message
-					console.error("from_address " + from_address)
 					let message = prepareMyWonAuctionOverview(auctions, buyer_address)
 
 					//send response
@@ -310,30 +308,39 @@ eventBus.once('headless_wallet_ready', () => {
 		}
 
 		else if (step === 'sell_startAuction') {
-			sellTempData[from_address]['public_key'] = text;
+			var public_key = text
+			var public_key_ok = true
 
-			let base64data = Buffer.from(JSON.stringify(sellTempData[from_address])).toString('base64');
-			let encodedbase64data = encodeURIComponent(base64data);
+			try {
+				//test pub key
+				encryptText("foo", public_key)
+			} catch (error) {
+				public_key_ok = false
+			}
 
-			//start auction
-			let message = message_SellStartAuction + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
-			message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
-			device.sendMessageToDevice(from_address, 'text', message);
-			steps[from_address] = 'mainMenu';
+			if (public_key_ok){
+				//split public into mx. 16 parts
+				const noPublicKeyParts = 16;
+				const maxDataLength = 64;
+				for (let index = 0; index < noPublicKeyParts; index++) {
+					const pubkeySlice = public_key.slice(index*maxDataLength, index*maxDataLength + maxDataLength);
+					if (pubkeySlice == "") break
+					sellTempData[from_address]['public_key_'+index] = pubkeySlice		
+				}			
+
+				let base64data = Buffer.from(JSON.stringify(sellTempData[from_address])).toString('base64');
+				let encodedbase64data = encodeURIComponent(base64data);
+
+				//start auction
+				let message = message_SellStartAuction + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
+				message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
+				device.sendMessageToDevice(from_address, 'text', message);
+				steps[from_address] = 'mainMenu';
+			}
+			else device.sendMessageToDevice(from_address, 'text', message_NotAValidKey);
 		}
 	});
 
-});
-
-
-/**
- * user pays to / sends data to the bot 
- */
-eventBus.on('new_my_transactions', (arrUnits) => {
-	// handle new unconfirmed payments
-	// and notify user
-
-	console.error("new_my_transactions")
 });
 
 process.on('unhandledRejection', up => { throw up; });
@@ -364,9 +371,7 @@ function getData(auctions_flat) {
 
 function prepareAuctionOverview(auctions, pairing_code) {
 	var message;
-
 	message = message_BuyOverview
-
 	var counter_running_auctions = 0
 
 	for (let k of Object.keys(auctions)) {
@@ -393,14 +398,39 @@ function prepareAuctionOverview(auctions, pairing_code) {
 		//add 10000 for fees
 		current_price = parseInt(current_price) + 10000
 
-		//encrypt
-		var encr_pairing_code = encryptText(pairing_code, auctions[k]['public_key'].valueOf())
+		//merge public_key  slices
+		const parts = 16;
+		var public_key = "";
+		for (let index = 0; index < parts; index++) {
+			const key = 'public_key_'+index;
+			if (auctions[k][key]){
+				var slice = auctions[k][key].valueOf();
+				public_key = public_key + slice	
+			}
+			else break;
+		}
+	
+		var encr_pairing_code = ""
+		//encrypt pairing code
+		try {
+			encr_pairing_code = encryptText(pairing_code, public_key)
+		}
+		catch(err) {
+			encr_pairing_code = "error, problem with public key"
+		}
 
 		// create buy link
 		var link_data = {
 			"buyer": "1",
-			"reference": k,
-			"pairing_code" : encr_pairing_code
+			"reference": k
+		}
+
+		//split encr_pairing_code into mx. 16 parts and add it to the link
+		const maxDataLength = 64;
+		for (let index = 0; index < parts; index++) {
+			const slice = encr_pairing_code.slice(index*maxDataLength, index*maxDataLength + maxDataLength);
+			if (slice == "") break
+			link_data['pairing_code_'+index] = slice		
 		}
 
 		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
@@ -416,39 +446,12 @@ function prepareAuctionOverview(auctions, pairing_code) {
 `	
 	}
 
-	if (counter_running_auctions == 0) message = message + "-\n\n"
+	if (counter_running_auctions == 0) message = message + "-\n"
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
 	return message;
 }
-
-function encryptText(text, public_key){
-	//see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
-
-	/*
-	var crypto = require("crypto");
-	var path = require("path");
-	var fs = require("fs");
-
-	//TODO use give key, not dummy key
-	var absolutePath = path.resolve("./res/public.pem");
-	var publicKey = fs.readFileSync(absolutePath, "utf8");
-	
-    var buffer = new Buffer(text);
-	var encrypted = crypto.publicEncrypt(    {
-        key: publicKey,
-        padding: constants.RSA_NO_PADDING 
-	}, buffer);
-	
-	
-	return encrypted.toString("base64");
-	*/
-
-	//TODO encrypt with public key
-	return ("dummy encrypted pairing code, encrypted with \""+public_key+"\"")
-}
-
 
 function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 	var message;
@@ -460,13 +463,10 @@ function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 
 		//only  auctions with status "buyer_data_confirm"	
 		var auction_status = auctions[k]['auction_status']
-		console.error("auction_status " + auction_status + "\n")
 		if (auction_status != 'buyer_data_confirm') continue
 
 		//only auction from where the user is seller
 		var seller = auctions[k]['seller'].valueOf();
-		console.error("seller " + seller + "\n")
-		console.error("sellerID " + sellerID + "\n\n")
 		if (sellerID.toUpperCase().trim() != seller.toUpperCase().trim()) continue
 
 		my_auctions += 1
@@ -474,7 +474,18 @@ function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 		// get interested data
 		var product_description = auctions[k]['product_description'].valueOf();
 		var buyer = auctions[k]['buyer'].valueOf();
-		let pairing_code = auctions[k]['pairing_code'].valueOf();
+
+		//merge pairing code slices
+		const noPairingCodeParts = 16;
+		var pairing_code = "";
+		for (let index = 0; index < noPairingCodeParts; index++) {
+			const key = 'pairing_code"_'+index;
+			if (key in auctions[k]){
+				slice = auctions[k][key]
+				pairing_code = pairing_code + slice.valueOf();	
+			}
+			else break;
+		}
 
 		message += `
 	** ${product_description} **
@@ -483,7 +494,7 @@ function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 	` 
 	}
 
-	if (my_auctions == 0) message = message + "-\n\n---------------------------\n\n"
+	if (my_auctions == 0) message = message + "-\n\n"
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
@@ -501,13 +512,10 @@ function prepareMyConfirmedAuctionOverview(auctions, buyerID) {
 
 		//only  auctions with status "buyer_data_confirm"	
 		var auction_status = auctions[k]['auction_status']
-		console.error("auction_status " + auction_status + "\n")
 		if (auction_status != 'buyer_data_confirm') continue
 
 		//only auction from where the user is buyer
 		var buyer = auctions[k]['buyer'].valueOf();
-		console.error("buyer " + buyer + "\n")
-		console.error("buyerID " + buyerID + "\n\n")
 		if (buyerID.toUpperCase().trim() != buyer.toUpperCase().trim()) continue
 
 		my_auctions += 1
@@ -527,7 +535,7 @@ function prepareMyConfirmedAuctionOverview(auctions, buyerID) {
 	` 
 	}
 
-	if (my_auctions == 0) message = message + "-\n\n---------------------------\n\n"
+	if (my_auctions == 0) message = message + "-\n\n"
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
@@ -545,13 +553,10 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 
 		//only  auctions with status "holding"	
 		var auction_status = auctions[k]['auction_status']
-		console.error("auction_status " + auction_status + "\n")
 		if (auction_status != 'holding') continue
 
 		//only auction from where the user is buyer
 		var buyer = auctions[k]['buyer'].valueOf();
-		console.error("buyer " + buyer + "\n")
-		console.error("buyerID " + buyerID + "\n\n")
 		if (buyerID.toUpperCase().trim() != buyer.toUpperCase().trim()) continue
 
 		my_auctions += 1
@@ -571,7 +576,6 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
 		let encodedbase64data = encodeURIComponent(base64data);
 		let confirmLink = "Confirm data sent: [confirm](byteball:" + aa_addess + "?amount=10000" + "&base64data=" + encodedbase64data + ")"
-		console.error("buylink: " + confirmLink)
 
 		message += `
 	** ${product_description} **
@@ -581,12 +585,28 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 	` 
 	}
 
-	if (my_auctions == 0) message = message + "-\n\n---------------------------\n\n"
+	if (my_auctions == 0) message = message + "-\n\n"
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
 	return message;
 }
+
+function encryptText(text, public_key){
+	//see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
+
+	var crypto = require("crypto");
+	var path = require("path");
+	var fs = require("fs");
+	
+	var encrypted = crypto.publicEncrypt(    {
+        key: new Buffer(public_key),
+        padding: constants.RSA_NO_PADDING 
+	}, new Buffer(text));
+	
+	return (encrypted.toString("base64"))
+}
+
 
 /*
 //generate dummy key pair
