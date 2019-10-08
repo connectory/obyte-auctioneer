@@ -1,6 +1,6 @@
 # Autonomous Auctioneer
 
-O<sub>byte</sub> The Autonomous auctioneer.  TODO: write docu.
+O<sub>byte</sub> The Autonomous auctioneer.  TODO: write documentation.
 
 ## Requirements
 
