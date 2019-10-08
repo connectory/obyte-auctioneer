@@ -13,6 +13,8 @@ let auctions_bot_data = {} // store data while an auction is running (seller's p
 let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
 
+const maxNumAuctionsToShow = 10;
+
 //the address of the a. agent
 let aa_addess = "6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF"
 
@@ -378,7 +380,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 
 		//do not show finished auctions
 		var auction_status = auctions[k]['auction_status']
-		if (auction_status != 'running') continue
+		if (auction_status != 'running' || (counter_running_auctions + 1) > maxNumAuctionsToShow) continue
 
 		else counter_running_auctions += 1
 
