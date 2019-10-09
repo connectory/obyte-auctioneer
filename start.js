@@ -9,6 +9,8 @@ const headlessWallet = require('headless-obyte');
 const objectHash = require('ocore/object_hash.js');
 const network = require("ocore/network");
 
+const { generateKeyPairSync } = require('crypto')
+
 let auctions_bot_data = {} // store data while an auction is running (seller's pairing code)
 let steps = {}; // store user steps
 let sellTempData = {}; // store seller's temp product data 
@@ -54,7 +56,10 @@ const message_SellLowestPrice = "Which is the lowest price you want? e.g. [100](
 const message_SellPriceSteps = "Which price steps to use? e.g. [50](suggest-command:50)";
 const message_SellTimeSteps = "Which time steps to use? e.g. [3600](suggest-command:3600)";
 const message_SellEncryptAlgo = "Which type of asymetric encryption do you want to use for the pairing key exchange? Currently only [AES](command:AES) supported by the bot.";
-const message_SellPublicKey = "What is your public key (to be used by the buyer to encrypt the pairing key)?";
+const message_SellPublicKey = "Paste your public key (to be used by the buyer to encrypt the pairing key). [I don't have one, generate a key pair for me](command:generate_keypair)"
+const message_SellKeyNotAValidKey = "Not a valid public key, please create a new keypair and paste the public key again.";
+const message_SellKeyPublicKey = "This is your generated public key:\n\n";
+const message_SellKeyPrivateKey = "This is your generated privated key. Don't forget store it somewhere to be used for later decryption of the buyer's pairing key:\n\n";
 const message_SellStartAuction = "Used this payment link to start the auction: [create auction](byteball:";
 
 const message_OverviewFinishedAuctionsForSeller = "This is the overview of your finished auctions:\n";
@@ -64,7 +69,6 @@ const message_BuyYouCanVoteForTheFollowinAuctions = "You can rate for the follow
 const message_BuyBidForProductPrefix = "Bid for product: [bid for product](byteball:";
 const message_BuyOverview = "The following auctions are currently running. Click to bid:\n";
 
-const message_NotAValidKey = "Not a valid public key, please create a new keypair and paste the public key again.";
 
 /**
  * headless wallet is ready
@@ -310,11 +314,25 @@ eventBus.once('headless_wallet_ready', () => {
 		}
 
 		else if (step === 'sell_startAuction') {
-			var public_key = text
-			var public_key_ok = true
+			var public_key
+			var message
 
+			if (text == "generate_keypair"){
+				const { publicKey, privateKey } = generateKeys();
+				public_key = publicKey
+
+				message += message_SellKeyPublicKey
+				message += publicKey
+				message += "\n"
+				message += message_SellKeyPrivateKey
+				message += privateKey
+				message += "\n\n"
+			}
+			else public_key = text
+
+			//test pub key
+			var public_key_ok = true
 			try {
-				//test pub key
 				encryptText("foo", public_key)
 			} catch (error) {
 				public_key_ok = false
@@ -334,12 +352,14 @@ eventBus.once('headless_wallet_ready', () => {
 				let encodedbase64data = encodeURIComponent(base64data);
 
 				//start auction
-				let message = message_SellStartAuction + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
+				message += message_SellStartAuction + aa_addess + "?amount=11000&base64data=" + encodedbase64data + ")"
 				message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
-				device.sendMessageToDevice(from_address, 'text', message);
+				
 				steps[from_address] = 'mainMenu';
 			}
-			else device.sendMessageToDevice(from_address, 'text', message_NotAValidKey);
+			else message = message_SellKeyNotAValidKey
+
+			device.sendMessageToDevice(from_address, 'text', message);
 		}
 	});
 
@@ -594,30 +614,8 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 	return message;
 }
 
-function encryptText(text, public_key){
-	//see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
-
-	var crypto = require("crypto");
-	var path = require("path");
-	var fs = require("fs");
-	
-	var encrypted = crypto.publicEncrypt(    {
-        key: new Buffer(public_key),
-        padding: constants.RSA_NO_PADDING 
-	}, new Buffer(text));
-	
-	return (encrypted.toString("base64"))
-}
-
-
-/*
-//generate dummy key pair
-
-const { writeFileSync } = require('fs')
-const { generateKeyPairSync } = require('crypto')
-
 function generateKeys() {
-    const { publicKey, privateKey } = generateKeyPairSync('rsa', 
+    return generateKeyPairSync('rsa', 
     {
             modulusLength: 4096,
             namedCurve: 'secp256k1', 
@@ -629,13 +627,27 @@ function generateKeys() {
                 type: 'pkcs8',
                 format: 'pem',
                 cipher: 'aes-256-cbc',
-                passphrase: "gehein"
+                passphrase: "geheim"
             } 
     });
-
-    writeFileSync('private.pem', privateKey)
-    writeFileSync('public.pem', publicKey)
 }
 
-generateKeys();
-*/
+function encryptText(text, public_key){
+    //see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
+
+
+	var crypto = require("crypto");
+	var path = require("path");
+    var fs = require("fs"); 
+        
+    const t = Buffer.from(text, 'utf8')
+    const p = Buffer.from(public_key, 'utf8')
+	
+	var encrypted = crypto.publicEncrypt(    {
+        key: p,
+        padding: constants.RSA_NO_PADDING 
+	}, t);
+	
+	return (encrypted.toString("base64"))
+}
+
