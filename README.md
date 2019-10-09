@@ -6,14 +6,14 @@ Open ToDos:
 
 # Autonomous Auctioneer
 
-O<sub>byte</sub> The Autonomous auctioneer.  TODO: write documentation.
+O<sub>byte</sub> The Autonomous auctioneer. 
 
 
 ## 1. About the Autonomous Auctioneer
 
 The Autonomous Auctioneer is a decentralized marketplace with built in escrow functionality and a dutch auction mechanism.
 
-Please find a detailed documentation on the modules and code here. 
+Please find a detailed documentation on the components of the Autonomous Auctioneer here. 
 There you can learn more about:
 
 * What are decentralized marketplaces?
