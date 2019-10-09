@@ -20,6 +20,9 @@ There you can learn more about:
 * What is escrow?
 * What are dutch auctions?
 * Process flow Autonomous auctioneer.
+* Code breakdown.
+* Screenshots interaction Chatbot UI.
+* Interaction with Tesnet Explorer Obyte.
 
 
 
