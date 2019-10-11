@@ -24,8 +24,8 @@ let aa_addess = "6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF"
 const message_mainMenuText = `
 o [Create an auction](command:create) 
 o [Bid on an auction](command:bid)
-o [Confirm data sent to seller](command:confirm)
 o [Get the buyer's pairing code](command:get_pairing_code) 
+o [Confirm data sent to seller](command:confirm)
 o [Rate a seller (as buyer)](command:buyer_vote)
 `
 
@@ -42,7 +42,7 @@ You can always type menu to get back to the main menu.
 const message_mainMenuDoSomethingElsePrefix = "\n\nDo something else? ";
 const message_mainMenuPrefix = "What do you want to do? ";
 
-const message_ConfirmWhichAddress = "From which address do your transactions? (Use the menu \"Insert my address\")";
+const message_ConfirmWhichAddress = "From which address has the transaction been made? (Use the menu \"Insert my address\")"
 
 const message_VoteGoodsReceived = "Did you receive the goods? [Yes](command:yes) | [No](command:no)";
 const message_VoteWhatIsYourVote = "What is your voting? [very good](command:5) | [good](command:4) | [neutral](command:3) | [bad](command:2) | [very bad](command:1)";
@@ -129,7 +129,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: get pairing code steps
 		else if (step === 'get_pairing_code_2') {
-			let buyer_address = text
+			let seller_address = text
 
 			setTimeout(() => {
 				network.requestFromLightVendor('light/get_aa_state_vars', {
@@ -140,7 +140,7 @@ eventBus.once('headless_wallet_ready', () => {
 					var auctions = getData(response)
 
 					//prepare message
-					let message = prepareMyConfirmedAuctionOverviewAsSeller(auctions, buyer_address)
+					let message = prepareAuctionOverviewAsSeller(auctions,seller_address)
 
 					//send response
 					device.sendMessageToDevice(from_address, 'text', message);
@@ -315,7 +315,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 		else if (step === 'sell_startAuction') {
 			var public_key
-			var message
+			var message = ""
 
 			if (text == "generate_keypair"){
 				const { publicKey, privateKey } = generateKeys();
@@ -461,9 +461,9 @@ function prepareAuctionOverview(auctions, pairing_code) {
 
 		message += `
 	** ${auctions[k]['product_description']} **
-	 o Current price: ${current_price}"
-	 o Time steps: ${time_steps}"
-	 o Price steps: ${price_steps}"	 	 
+	 o Current price: ${current_price}
+	 o Time steps: ${time_steps}
+	 o Price steps: ${price_steps} 	 
 	 o ${buylink}
 `	
 	}
@@ -475,7 +475,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 	return message;
 }
 
-function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
+function prepareAuctionOverviewAsSeller(auctions, sellerID) {
 	var message;
 	message = message_OverviewFinishedAuctionsForSeller
 
@@ -485,7 +485,7 @@ function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 
 		//only  auctions with status "buyer_data_confirm"	
 		var auction_status = auctions[k]['auction_status']
-		if (auction_status != 'buyer_data_confirm') continue
+		if (auction_status != 'holding') continue
 
 		//only auction from where the user is seller
 		var seller = auctions[k]['seller'].valueOf();
@@ -501,9 +501,9 @@ function prepareMyConfirmedAuctionOverviewAsSeller(auctions, sellerID) {
 		const noPairingCodeParts = 16;
 		var pairing_code = "";
 		for (let index = 0; index < noPairingCodeParts; index++) {
-			const key = 'pairing_code"_'+index;
+			const key = 'pairing_code_'+index;
 			if (key in auctions[k]){
-				slice = auctions[k][key]
+				var slice = auctions[k][key]
 				pairing_code = pairing_code + slice.valueOf();	
 			}
 			else break;
