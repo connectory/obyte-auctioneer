@@ -1,5 +1,8 @@
 /*jslint node: true */
 'use strict';
+
+const crypto = require('crypto')
+
 const constants = require('ocore/constants.js');
 const conf = require('ocore/conf');
 const db = require('ocore/db');
@@ -13,7 +16,7 @@ const { generateKeyPairSync } = require('crypto')
 
 let auctions_bot_data = {} // store data while an auction is running (seller's pairing code)
 let steps = {}; // store user steps
-let sellTempData = {}; // store seller's temp product data 
+let tempData = {}; // store seller's temp product data 
 
 const maxNumAuctionsToShow = 10;
 
@@ -115,7 +118,7 @@ eventBus.once('headless_wallet_ready', () => {
 				case 'get_pairing_code':
 					device.sendMessageToDevice(from_address, 'text', message_ConfirmWhichAddress);
 					steps[from_address] = 'get_pairing_code_2';
-					break;	
+					break;			
 				case 'buyer_vote':
 					device.sendMessageToDevice(from_address, 'text', message_ConfirmWhichAddress);
 					steps[from_address] = 'buyer_vote_1';
@@ -129,25 +132,49 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: get pairing code steps
 		else if (step === 'get_pairing_code_2') {
-			let seller_address = text
+			tempData[from_address] = { "seller_address": text }
 
-			setTimeout(() => {
-				network.requestFromLightVendor('light/get_aa_state_vars', {
-					address: aa_addess
-				}, (ws, request, response) => {
+			device.sendMessageToDevice(from_address, 'text', "Do you want me to decrypt the pairing code of the buyer or do you want to do it outside of this Chatbot on your own? Type [Yes](command:yes) (if you want me to do it) or [No](command:no).");
+			steps[from_address] = 'get_pairing_code_3';
+		}
 
-					//get auction data 
-					var auctions = getData(response)
+		else if (step === 'get_pairing_code_3') {
+			let next_step = false
+			let private_key = ""
+			if (text.toLowerCase() == "yes"){
+				device.sendMessageToDevice(from_address, 'text', "What is you private key?");
+			}
+			else if (text.toLowerCase() == "no")
+			{	
+				private_key = "do_not_decrypt"
+				next_step = true
+			}
+			else {
+				private_key = text
+				next_step = true
+			}
+	
+			if (next_step){
+				let seller_address = tempData[from_address]['seller_address']
 
-					//prepare message
-					let message = prepareAuctionOverviewAsSeller(auctions,seller_address)
+				setTimeout(() => {
+					network.requestFromLightVendor('light/get_aa_state_vars', {
+						address: aa_addess
+					}, (ws, request, response) => {
 
-					//send response
-					device.sendMessageToDevice(from_address, 'text', message);
+						//get auction data 
+						var auctions = getData(response)
 
-					steps[from_address] = 'mainMenu';
-				})
-			}, 1000)
+						//prepare message
+						let message = prepareAuctionOverviewAsSeller(auctions,seller_address,private_key)
+
+						//send response
+						device.sendMessageToDevice(from_address, 'text', message);
+
+						steps[from_address] = 'mainMenu';
+					})
+				}, 1000)
+			}
 		}
 
 		//state machine: buyer steps
@@ -197,43 +224,43 @@ eventBus.once('headless_wallet_ready', () => {
 		}
 
 		else if (step === 'buyer_vote_2') {
-			sellTempData[from_address] = { "reference": text }
+			tempData[from_address] = { "reference": text }
 
 			device.sendMessageToDevice(from_address, 'text', message_VoteGoodsReceived);
 			steps[from_address] = 'buyer_vote_3';
 		}
 				
 		else if (step === 'buyer_vote_3') {
-			sellTempData[from_address]["goodReceived"] =  text
+			tempData[from_address]["goodReceived"] =  text
 
 			device.sendMessageToDevice(from_address, 'text', message_VoteWhatIsYourVote);
 			steps[from_address] = 'buyer_vote_4';
 		}
 
 		else if (step === 'buyer_vote_4') {
-			sellTempData[from_address]["voting"] =  text
+			tempData[from_address]["voting"] =  text
 
 			device.sendMessageToDevice(from_address, 'text', message_VoteWhatIsYourComment);
 			steps[from_address] = 'buyer_vote_5';
 		}
 
 		else if (step === 'buyer_vote_5') {
-			sellTempData[from_address]["comment"] =  text
+			tempData[from_address]["comment"] =  text
 
 			// create vote link
 			var link_data;
-			if (sellTempData[from_address]["goodReceived"]  == "yes") link_data = {
-				"reference": sellTempData[from_address]["reference"],
+			if (tempData[from_address]["goodReceived"]  == "yes") link_data = {
+				"reference": tempData[from_address]["reference"],
 				"goods_receipt": "1",
-				"voting": sellTempData[from_address]["voting"],
-				"comment": sellTempData[from_address]["comment"]
+				"voting": tempData[from_address]["voting"],
+				"comment": tempData[from_address]["comment"]
 			}
 
 			else link_data = {
-				"reference": sellTempData[from_address]["reference"],
+				"reference": tempData[from_address]["reference"],
 				"no_goods_receipt": "1",
-				"voting": sellTempData[from_address]["voting"],
-				"comment": sellTempData[from_address]["comment"]
+				"voting": tempData[from_address]["voting"],
+				"comment": tempData[from_address]["comment"]
 			}
 
 			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
@@ -271,43 +298,43 @@ eventBus.once('headless_wallet_ready', () => {
 
 		//state machine: sell steps
 		else if (step === 'sell_description') {
-			sellTempData[from_address] = { "seller": "true" }
-			sellTempData[from_address]['product_description'] = text;
+			tempData[from_address] = { "seller": "true" }
+			tempData[from_address]['product_description'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellStartPrice);
 			steps[from_address] = 'sell_startprice';
 		}
 
 		else if (step === 'sell_startprice') {
-			sellTempData[from_address]['start_price'] = text;
+			tempData[from_address]['start_price'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellLowestPrice);
 			steps[from_address] = 'sell_lowestprice';
 		}
 
 		else if (step === 'sell_lowestprice') {
-			sellTempData[from_address]['lowest_price'] = text;
+			tempData[from_address]['lowest_price'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellPriceSteps);
 			steps[from_address] = 'sell_pricesteps';
 		}
 
 		else if (step === 'sell_pricesteps') {
-			sellTempData[from_address]['price_steps'] = text;
+			tempData[from_address]['price_steps'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellTimeSteps);
 			steps[from_address] = 'sell_timesteps';
 		}
 
 		else if (step === 'sell_timesteps') {
-			sellTempData[from_address]['time_steps'] = text;
+			tempData[from_address]['time_steps'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellEncryptAlgo);
 			steps[from_address] = 'sell_encryption_algo';
 		}
 
 		else if (step === 'sell_encryption_algo') {
-			sellTempData[from_address]['encryptionAlgorithm'] = text;
+			tempData[from_address]['encryptionAlgorithm'] = text;
 
 			device.sendMessageToDevice(from_address, 'text', message_SellPublicKey);
 			steps[from_address] = 'sell_startAuction';
@@ -319,6 +346,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 			if (text == "generate_keypair"){
 				const { publicKey, privateKey } = generateKeys();
+
 				public_key = publicKey
 
 				message += message_SellKeyPublicKey
@@ -332,7 +360,7 @@ eventBus.once('headless_wallet_ready', () => {
 
 			//test pub key
 			var public_key_ok = true
-			try {
+		    try {
 				encryptText("foo", public_key)
 			} catch (error) {
 				public_key_ok = false
@@ -345,10 +373,10 @@ eventBus.once('headless_wallet_ready', () => {
 				for (let index = 0; index < noPublicKeyParts; index++) {
 					const pubkeySlice = public_key.slice(index*maxDataLength, index*maxDataLength + maxDataLength);
 					if (pubkeySlice == "") break
-					sellTempData[from_address]['public_key_'+index] = pubkeySlice		
+					tempData[from_address]['public_key_'+index] = pubkeySlice		
 				}			
 
-				let base64data = Buffer.from(JSON.stringify(sellTempData[from_address])).toString('base64');
+				let base64data = Buffer.from(JSON.stringify(tempData[from_address])).toString('base64');
 				let encodedbase64data = encodeURIComponent(base64data);
 
 				//start auction
@@ -475,7 +503,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 	return message;
 }
 
-function prepareAuctionOverviewAsSeller(auctions, sellerID) {
+function prepareAuctionOverviewAsSeller(auctions, sellerID, private_key) {
 	var message;
 	message = message_OverviewFinishedAuctionsForSeller
 
@@ -509,14 +537,38 @@ function prepareAuctionOverviewAsSeller(auctions, sellerID) {
 			else break;
 		}
 
+		//decrypt if required
+		if (private_key != "do_not_decrypt"){
+			try {
+				pairing_code = decryptText(pairing_code, private_key)
+				message += `
+	** ${product_description} **
+	o Sold to: ${buyer}
+	o Decrypted Pairing Code: ${pairing_code}
+				` 				
+			} catch (error) {
+				message += `
+	** ${product_description} **
+	o Sold to: ${buyer}
+	o Encrypted Pairing Code (could not be decrypted):
+	${pairing_code}
+	` 
+			}			
+		}
+
+		else{
+
 		message += `
 	** ${product_description} **
 	 o Sold to: ${buyer}
-	 o Encrypted Pairing Code: ${pairing_code}
+	 o Encrypted pairing Code: ${pairing_code}
 	` 
+		}
 	}
 
 	if (my_auctions == 0) message = message + "-\n\n"
+
+	message += `\n\nYou can now get in contact with the buyer to exchange data to be able to send your goods by going to the "Chat" Tab of the wallet (bottom right) → "Add new device" → "Accept invitation from the other device" → Copy and paste the decrypted pairing code.`
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
@@ -617,7 +669,7 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 function generateKeys() {
     return generateKeyPairSync('rsa', 
     {
-            modulusLength: 4096,
+            modulusLength: 512,
             namedCurve: 'secp256k1', 
             publicKeyEncoding: {
                 type: 'spki',
@@ -626,28 +678,32 @@ function generateKeys() {
             privateKeyEncoding: {
                 type: 'pkcs8',
                 format: 'pem',
-                cipher: 'aes-256-cbc',
-                passphrase: "geheim"
+              //  cipher: 'aes-256-cbc',
+               // passphrase: "geheim"
             } 
     });
 }
 
-function encryptText(text, public_key){
-    //see https://nodejs.org/api/crypto.html#crypto_crypto_publicencrypt_key_buffer
 
 
-	var crypto = require("crypto");
-	var path = require("path");
-    var fs = require("fs"); 
-        
-    const t = Buffer.from(text, 'utf8')
-    const p = Buffer.from(public_key, 'utf8')
-	
-	var encrypted = crypto.publicEncrypt(    {
-        key: p,
-        padding: constants.RSA_NO_PADDING 
+function encryptText(toEncrypt, publicKey) {
+    const t = Buffer.from(toEncrypt, 'utf8')
+    const encrypted = crypto.publicEncrypt(    {
+        key: publicKey,
+        paddig: constants.RSA_NO_PADDING 
 	}, t);
-	
-	return (encrypted.toString("base64"))
+    return encrypted.toString('base64')
 }
-
+  
+function decryptText(toDecrypt, privateKey) {
+    const buffer = Buffer.from(toDecrypt, 'base64')
+    const decrypted = crypto.privateDecrypt(
+      {
+        key: privateKey.toString(),
+       
+        
+      },
+      buffer,
+    )
+    return decrypted.toString('utf8')
+}
