@@ -14,7 +14,6 @@ const network = require("ocore/network");
 
 const { generateKeyPairSync } = require('crypto')
 
-let auctions_bot_data = {} // store data while an auction is running (seller's pairing code)
 let steps = {}; // store user steps
 let tempData = {}; // store seller's temp product data 
 
