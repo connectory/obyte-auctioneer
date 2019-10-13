@@ -52,7 +52,13 @@ const message_VoteWhatIsYourVote = "What is your voting? [very good](command:5) 
 const message_VoteWhatIsYourComment = "What is your comment? [Everything fine, thanks.](suggest-command:Everything fine, thanks.)";
 const message_VoteUsedThisVoteLink = "Use this link to send your rating: [link](byteball:";
 
-const message_SellPairingCode = "What is your pairing code? (It will be encrypted with the seller's public key before publishing it.)";
+const message_SellPairingCode = `What is your pairing code?
+It will be encrypted with the seller's public key before publishing it.
+You find the pairing code as follows:
+o Press the back button
+o Add new device
+o Invite the other device
+`
 const message_SellDescription = "What do you want to sell? e.g. [An Apple](suggest-command:An Apple)";
 const message_SellStartPrice = "Which price to start with? e.g. [500](suggest-command:500)";
 const message_SellLowestPrice = "Which is the lowest price you want? e.g. [100](suggest-command:100)";
@@ -65,7 +71,8 @@ const message_SellKeyPublicKey = "This is your generated public key:\n\n";
 const message_SellKeyPrivateKey = "This is your generated privated key. Don't forget store it somewhere to be used for later decryption of the buyer's pairing key:\n\n";
 const message_SellStartAuction = "Used this payment link to start the auction: [create auction](byteball:";
 
-const message_OverviewFinishedAuctionsForSeller = "This is the overview of your finished auctions:\n";
+const message_PairingOverviewFinishedAuctionsForSeller = "This is the overview of your finished auctions:\n";
+const message_PairingGetInContact = `\n\nYou can now get in contact with the buyer to exchange data to be able to send your goods by going to the "Chat" Tab of the wallet (bottom right) → "Add new device" → "Accept invitation from the other device" → Copy and paste the decrypted pairing code.`;
 
 const message_BuyYouWonTheFollowinAuctions = "You won the following auctions. For which one you want to confirm that you have sent your data to the seller?:\n";
 const message_BuyYouCanVoteForTheFollowinAuctions = "You can rate for the following auctions: \n";
@@ -170,10 +177,9 @@ eventBus.once('headless_wallet_ready', () => {
 
 						//send response
 						device.sendMessageToDevice(from_address, 'text', message);
-
-						steps[from_address] = 'mainMenu';
 					})
 				}, 1000)
+				steps[from_address] = 'mainMenu';
 			}
 		}
 
@@ -460,32 +466,31 @@ function prepareAuctionOverview(auctions, pairing_code) {
 			else break;
 		}
 	
-		var encr_pairing_code = ""
-		//encrypt pairing code
-		try {
-			encr_pairing_code = encryptText(pairing_code, public_key)
-		}
-		catch(err) {
-			encr_pairing_code = "error, problem with public key"
-		}
-
-		// create buy link
+		//create buy link
 		var link_data = {
 			"buyer": "1",
 			"reference": k
 		}
+		var buylink = ""
+		try {
+			//encrypt pairing code
+			var encr_pairing_code = encryptText(pairing_code, public_key)
 
-		//split encr_pairing_code into mx. 16 parts and add it to the link
-		const maxDataLength = 64;
-		for (let index = 0; index < parts; index++) {
-			const slice = encr_pairing_code.slice(index*maxDataLength, index*maxDataLength + maxDataLength);
-			if (slice == "") break
-			link_data['pairing_code_'+index] = slice		
+			//split encr_pairing_code into mx. 16 parts and add it to the link
+			const maxDataLength = 64;
+			for (let index = 0; index < parts; index++) {
+				const slice = encr_pairing_code.slice(index*maxDataLength, index*maxDataLength + maxDataLength);
+				if (slice == "") break
+				link_data['pairing_code_'+index] = slice		
+			}
+
+			let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
+			let encodedbase64data = encodeURIComponent(base64data);
+			buylink = message_BuyBidForProductPrefix + aa_addess + "?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
 		}
-
-		let base64data = Buffer.from(JSON.stringify(link_data)).toString('base64');
-		let encodedbase64data = encodeURIComponent(base64data);
-		let buylink = message_BuyBidForProductPrefix + aa_addess + "?amount=" + current_price + "&base64data=" + encodedbase64data + ")"
+		catch(err) {
+			buylink = "Problem with the seller's public key, bidding not possible."
+		}		
 
 		message += `
 	** ${auctions[k]['product_description']} **
@@ -505,7 +510,7 @@ function prepareAuctionOverview(auctions, pairing_code) {
 
 function prepareAuctionOverviewAsSeller(auctions, sellerID, private_key) {
 	var message;
-	message = message_OverviewFinishedAuctionsForSeller
+	message = message_PairingOverviewFinishedAuctionsForSeller
 
 	var my_auctions = 0
 
@@ -540,11 +545,11 @@ function prepareAuctionOverviewAsSeller(auctions, sellerID, private_key) {
 		//decrypt if required
 		if (private_key != "do_not_decrypt"){
 			try {
-				pairing_code = decryptText(pairing_code, private_key)
+				var decr_pairing_code = decryptText(pairing_code, private_key)
 				message += `
 	** ${product_description} **
 	o Sold to: ${buyer}
-	o Decrypted Pairing Code: ${pairing_code}
+	o Decrypted Pairing Code: ${decr_pairing_code}
 				` 				
 			} catch (error) {
 				message += `
@@ -568,7 +573,7 @@ function prepareAuctionOverviewAsSeller(auctions, sellerID, private_key) {
 
 	if (my_auctions == 0) message = message + "-\n\n"
 
-	message += `\n\nYou can now get in contact with the buyer to exchange data to be able to send your goods by going to the "Chat" Tab of the wallet (bottom right) → "Add new device" → "Accept invitation from the other device" → Copy and paste the decrypted pairing code.`
+	message += message_PairingGetInContact
 
 	message += message_mainMenuDoSomethingElsePrefix + message_mainMenuText
 
@@ -669,7 +674,7 @@ function prepareMyWonAuctionOverview(auctions, buyerID) {
 function generateKeys() {
     return generateKeyPairSync('rsa', 
     {
-            modulusLength: 512,
+            modulusLength: 1024,
             namedCurve: 'secp256k1', 
             publicKeyEncoding: {
                 type: 'spki',
@@ -699,9 +704,7 @@ function decryptText(toDecrypt, privateKey) {
     const buffer = Buffer.from(toDecrypt, 'base64')
     const decrypted = crypto.privateDecrypt(
       {
-        key: privateKey.toString(),
-       
-        
+        key: privateKey.toString(),   
       },
       buffer,
     )
