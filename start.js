@@ -19,7 +19,7 @@ let tempData = {}; // store seller's temp product data
 
 const maxNumAuctionsToShow = 10;
 
-//the address of the a. agent
+//the address of the autonomous agent
 let aa_addess = "6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF"
 
 //Messages
