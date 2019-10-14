@@ -70,6 +70,8 @@ const message_SellKeyPublicKey = "This is your generated public key:\n\n";
 const message_SellKeyPrivateKey = "This is your generated privated key. Don't forget store it somewhere to be used for later decryption of the buyer's pairing key:\n\n";
 const message_SellStartAuction = "Used this payment link to start the auction: [create auction](byteball:";
 
+const message_PairingWhatIsYourPrivateKey = `"What is your private key?
+Scroll back up to find it, in case you have not stored it and copy it including "-----BEGIN PRIVATE KEY-----" at the beginning and "-----END PRIVATE KEY-----" at the end.`
 const message_PairingOverviewFinishedAuctionsForSeller = "This is the overview of your finished auctions:\n";
 const message_PairingGetInContact = `\n\nYou can now get in contact with the buyer to exchange data to be able to send your goods by going to the "Chat" Tab of the wallet (bottom right) → "Add new device" → "Accept invitation from the other device" → Copy and paste the decrypted pairing code.`;
 
@@ -77,6 +79,7 @@ const message_BuyYouWonTheFollowinAuctions = "You won the following auctions. Fo
 const message_BuyYouCanVoteForTheFollowinAuctions = "You can rate for the following auctions: \n";
 const message_BuyBidForProductPrefix = "Bid for product: [bid for product](byteball:";
 const message_BuyOverview = "The following auctions are currently running. Click to bid:\n";
+
 
 
 /**
@@ -148,7 +151,7 @@ eventBus.once('headless_wallet_ready', () => {
 			let next_step = false
 			let private_key = ""
 			if (text.toLowerCase() == "yes"){
-				device.sendMessageToDevice(from_address, 'text', "What is you private key?");
+				device.sendMessageToDevice(from_address, 'text', message_PairingWhatIsYourPrivateKey);
 			}
 			else if (text.toLowerCase() == "no")
 			{	
