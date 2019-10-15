@@ -1,6 +1,6 @@
 Open ToDos:
 
-* Link Medium article 1.
+* Link Medium article 1.  
 * Add final AA address and definer unit 3.
 
 
