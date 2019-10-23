@@ -35,7 +35,8 @@ const message_welcome = `
 Welcome to the Autonomous Auctioneer!
 
 With the Autonomous Auctioneer you can create and bid on auctions.
-More details on it have a look [here](https://medium.com/@stgtconnectory/autonomous-auctioneer-stuttgart-connectory-hackathon-e5a703c6217a). 
+More details on it have a look here: 
+https://medium.com/@stgtconnectory/autonomous-auctioneer-stuttgart-connectory-hackathon-e5a703c6217a 
 
 Type [menu](command:menu) to start.
 You can always type menu to get back to the main menu.
