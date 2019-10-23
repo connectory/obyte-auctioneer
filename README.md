@@ -1,9 +1,3 @@
-Open ToDos:
-
-* Link Medium article 1.
-* Add final AA address and definer unit 3.
-
-
 # Autonomous Auctioneer
 
 O<sub>byte</sub> The Autonomous auctioneer. 
@@ -13,7 +7,7 @@ O<sub>byte</sub> The Autonomous auctioneer.
 
 The Autonomous Auctioneer is a decentralized marketplace with built in escrow functionality and a dutch auction mechanism.
 
-Please find a detailed documentation on the components of the Autonomous Auctioneer here. 
+Please find a detailed documentation on the components of the Autonomous Auctioneer [here](https://medium.com/@stgtconnectory/autonomous-auctioneer-stuttgart-connectory-hackathon-e5a703c6217a). 
 There you can learn more about:
 
 * What are decentralized marketplaces?
@@ -54,7 +48,8 @@ Copy this pairing code to your O<sub>byte</sub> wallet: Chat tab, Add a new devi
 
 ## 3. Autonomous Agent
 
-
+Check in explorer: https://testnetexplorer.obyte.org/#6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF
+Agent address: 6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF
 
 
 ## Help
