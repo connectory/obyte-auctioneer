@@ -49,6 +49,7 @@ Copy this pairing code to your O<sub>byte</sub> wallet: Chat tab, Add a new devi
 ## 3. Autonomous Agent
 
 Check in explorer: https://testnetexplorer.obyte.org/#6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF
+
 Agent address: 6Y4MHVF22KFJYY6LJBDU5GVOIUGPHAVF
 
 
